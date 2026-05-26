@@ -52,33 +52,46 @@ export default function Button({
 
 const styles = StyleSheet.create({
   base: {
-    height: 50,
+    height: 52,
     backgroundColor: COLORS.accentBlue,
     borderRadius: BORDER_RADIUS.md,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: SPACING.lg,
     flexDirection: 'row',
+    // High-end neon glowing blue drop shadow
+    shadowColor: COLORS.accentBlue,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 6,
   },
   outline: {
     backgroundColor: 'transparent',
-    borderWidth: 1.5,
+    borderWidth: 1.8,
     borderColor: COLORS.accentBlue,
   },
   light: {
     backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    // Subtle button shadow
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 2,
   },
   disabled: {
-    backgroundColor: COLORS.divider,
-    borderColor: COLORS.border,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderColor: 'rgba(255, 255, 255, 0.05)',
   },
   text: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
     color: '#FFFFFF',
-    letterSpacing: 0.2,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase', // Bold modern high-end feel
   },
   textOutline: {
     color: COLORS.accentBlue,

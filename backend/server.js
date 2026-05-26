@@ -71,9 +71,21 @@ INSTRUCTIONS:
    - An emotional impact summary
    - A logical "reasoning" paragraph explaining why this path occurs based on the selected decision-making lens (${personality}) and risk posture (${risk}).
 3. Extract 4 crucial "key factors to consider" that the user should monitor.
-4. Conclude with a strictly neutral, non-advice "final note".
-5. IMPORTANT BEHAVIOR RULES:
-   - Do NOT give advice or recommendations.
+4. COGNITIVE BIAS ANALYSIS (New Module):
+   - Analyze the user's decision statement for common human cognitive biases (e.g., Sunk Cost Fallacy, Present Bias/Instant Gratification, Loss Aversion, Framing Bias, Confirmation Bias, Optimism Bias, Status Quo Bias).
+   - Calculate a "bias_score" (integer between 0 and 100, where 0 is perfectly objective and 100 is highly emotional/unbalanced).
+   - List 1 to 3 "detected_biases" (each having a "name", a "severity": low/medium/high, and an "explanation" detailing how it affects their decision).
+   - Provide a "reframed_decision": a completely objective, neutral, and bias-free alternative rephrasing of their decision that will help them think clearly.
+5. MULTI-AGENT BOARDROOM DEBATE (New Module):
+   - Spawn a debate transcript between three highly distinct virtual advisors:
+     * "The Visionary Optimist": focuses on potential upside, growth, and bold opportunities.
+     * "The Devil's Advocate": focuses on risk mitigation, potential downside, failure points, and worst-case scenarios.
+     * "The Cold Pragmatist": focuses on objective, data-driven, practical steps, and current resource usage.
+   - Under "debate_transcript", simulate a lively back-and-forth debate of at least 3 total turns (exchanges) where these advisors argue the pros, cons, and trade-offs of the user's specific decision.
+   - Summarize their debate into a neutral "consensus_summary" showing their final compromise.
+6. Conclude with a strictly neutral, non-advice "final note" as an analytical disclaimer.
+7. IMPORTANT BEHAVIOR RULES:
+   - Do NOT give direct advice or recommendations.
    - Do NOT use the words "you should", "I recommend", "you ought to", or "it is best to".
    - The tone must remain completely objective, logical, and analytical.
 
@@ -96,6 +108,39 @@ Return your response ONLY as a single valid JSON object following this exact str
     "Factor 1 text...",
     "Factor 2 text..."
   ],
+  "cognitive_analysis": {
+    "bias_score": 45,
+    "detected_biases": [
+      {
+        "name": "Sunk Cost Fallacy",
+        "severity": "high",
+        "explanation": "Explanation text..."
+      }
+    ],
+    "reframed_decision": "Objective rephrased version of the decision"
+  },
+  "boardroom_debate": {
+    "advisors": [
+      { "name": "The Visionary Optimist", "role": "Focuses on potential upside, growth, and bold opportunities" },
+      { "name": "The Devil's Advocate", "role": "Focuses on risk mitigation, potential downside, failure points, and worst-case scenarios" },
+      { "name": "The Cold Pragmatist", "role": "Focuses on objective, data-driven, practical steps, and current resource usage" }
+    ],
+    "debate_transcript": [
+      {
+        "speaker": "The Visionary Optimist",
+        "message": "Dialogue text..."
+      },
+      {
+        "speaker": "The Devil's Advocate",
+        "message": "Dialogue text..."
+      },
+      {
+        "speaker": "The Cold Pragmatist",
+        "message": "Dialogue text..."
+      }
+    ],
+    "consensus_summary": "Summary of advisors' consensus"
+  },
   "final_note": "A neutral analytical disclaimer reminding the user that this is a simulator, not advice."
 }
 
@@ -376,10 +421,118 @@ function generateServerSimulation(decision, riskTolerance, personality) {
     ];
   }
 
+  // Build high-fidelity dynamic offline simulation components
+  let biasScore = 30;
+  let detectedBiases = [];
+  let reframedDecision = `Should I evaluate the exact pros and cons of proceeding with this decision objectively?`;
+  let advisors = [
+    { name: "The Visionary Optimist", role: "Focuses on potential upside, growth, and bold opportunities" },
+    { name: "The Devil's Advocate", role: "Focuses on risk mitigation, potential downside, failure points, and worst-case scenarios" },
+    { name: "The Cold Pragmatist", role: "Focuses on objective, data-driven, practical steps, and current resource usage" }
+  ];
+  let debateTranscript = [];
+  let consensusSummary = "";
+
+  if (hasPet) {
+    biasScore = 20;
+    detectedBiases = [{
+      name: "Anthropomorphic Projection Bias",
+      severity: "low",
+      explanation: "Assuming that your pet interprets rapid physical movement (like sprinting away) with human-like understanding rather than animal threat/play reflexes."
+    }];
+    reframedDecision = `What are the physiological safety differences between staying calm or utilizing direct food distraction when managing animal behaviors?`;
+    debateTranscript = [
+      { speaker: "The Visionary Optimist", message: "If we play with energy, we build a deeper bond with the animal. Adventure and active play are high-reward!" },
+      { speaker: "The Devil's Advocate", message: "Running in tight indoor spaces is a physical hazard. Sudden movements trigger instinctual play-biting or scratches. Safety first." },
+      { speaker: "The Cold Pragmatist", message: "Redirection with a treat or toy resolves both needs. It manages animal attention at zero hazard cost. Focus on structured feeding." }
+    ];
+    consensusSummary = "Use positive reinforcement or calm positioning as primary safety metrics, reserving physical play for outdoor spaces.";
+
+  } else if (hasSymptom && hasDestination) {
+    biasScore = 55;
+    detectedBiases = [
+      {
+        name: "Loss Aversion / Sunk Cost Fallacy",
+        severity: "high",
+        explanation: "Fearing that staying home will result in irrecoverable progress loss, over-weighting short-term attendance over long-term immune system recovery."
+      }
+    ];
+    reframedDecision = `Should I prioritize biological healing and infection control today, or accept cognitive performance drops to maintain attendance?`;
+    debateTranscript = [
+      { speaker: "The Visionary Optimist", message: "We should go! Pushing through challenges demonstrates elite resilience and protects our streak of success." },
+      { speaker: "The Devil's Advocate", message: "Pushing through with a fever drains your reserves. You will operate at 20% efficiency and potentially infect everyone in the room." },
+      { speaker: "The Cold Pragmatist", message: "Examine the policy. Can you request remote slides or submit a medical deferral? If yes, staying home preserves physical assets with zero penalty." }
+    ];
+    consensusSummary = "Rest immediately to shorten total illness duration, but negotiate remote attendance channels or lecture slide shares within 12 hours.";
+
+  } else if (hasLeisure && hasProductivity) {
+    biasScore = 70;
+    detectedBiases = [
+      {
+        name: "Present Bias / Hyperbolic Discounting",
+        severity: "high",
+        explanation: "Valuing the immediate, high-dopamine relaxation value of entertainment now while heavily discounting the upcoming stress and temporal debt of deadlines."
+      }
+    ];
+    reframedDecision = `How should I divide my available hours between study tasks and leisure to maintain stress-free productivity?`;
+    debateTranscript = [
+      { speaker: "The Visionary Optimist", message: "A short gaming/movie session will recharge your brain! Let's enjoy ourselves first to build creative inspiration." },
+      { speaker: "The Devil's Advocate", message: "Leisure blockades will trigger a massive panic spike tonight. Work backlog grows hourly. Stop procrastinating." },
+      { speaker: "The Cold Pragmatist", message: "Apply a timed interval system. 90 minutes of focused task execution followed by a 20-minute leisure reward. This mitigates exhaustion without debt." }
+    ];
+    consensusSummary = "Execute a Pomodoro or structured split-time system to secure progress before unlocking guilt-free leisure rewards.";
+
+  } else if (hasFood) {
+    biasScore = 40;
+    detectedBiases = [
+      {
+        name: "Optimism Bias & Sunk Cost",
+        severity: "medium",
+        explanation: "Believing you are biologically immune to potential bacterial active pathogens because you do not want to throw away a purchased food item."
+      }
+    ];
+    reframedDecision = `Should I consume this questionable item with potential mold markers, or utilize a safe nutritional alternative?`;
+    debateTranscript = [
+      { speaker: "The Visionary Optimist", message: "The spots look tiny! It probably tastes fine and wasting food is a shame. Trim the edge and eat it." },
+      { speaker: "The Devil's Advocate", message: "A minor food poisoning incident will cost you 2 days of productive life. Discarding a low-cost item is far cheaper than medical costs." },
+      { speaker: "The Cold Pragmatist", message: "Assess the structural firmness of the item. If it is soft or smells off, the fungal network is already deep. Discard it." }
+    ];
+    consensusSummary = "Do not consume if structural integrity has degraded; prioritize physical safety when spotless alternatives exist.";
+
+  } else {
+    // General action fallbacks
+    let actionStr = cleanNorm.replace(/should i|should we|i want to|i need to|is it good to|what if i/gi, '').trim() || 'this action';
+    biasScore = 35;
+    detectedBiases = [
+      {
+        name: "Status Quo Bias / Framing Effect",
+        severity: "medium",
+        explanation: "Heavily favoring standard comfortable patterns or framing the choice around immediate fears instead of analyzing long-term compounding effects."
+      }
+    ];
+    reframedDecision = `What are the clear resource expenditures, risks, and compounding advantages of choosing to: "${actionStr}"?`;
+    debateTranscript = [
+      { speaker: "The Visionary Optimist", message: `We must leap forward! Starting "${actionStr}" opens brand new opportunities and forces positive change.` },
+      { speaker: "The Devil's Advocate", message: `Starting "${actionStr}" introduces severe volatility and eats up valuable spare time. What if we fail or get burnt out?` },
+      { speaker: "The Cold Pragmatist", message: `Test it incrementally. Do not resign or invest large capital immediately. Allocate 5 hours a week for a month to gather concrete evidence.` }
+    ];
+    consensusSummary = "Pursue the action through small, low-risk experiments to validate outcomes before committing significant resources.";
+  }
+
   return {
     decision_summary: decision,
     scenarios: scenarios,
     key_factors_to_consider: keyFactors,
+    cognitive_analysis: {
+      bias_score: biasScore,
+      detected_biases: detectedBiases,
+      reframed_decision: reframedDecision
+    },
+    boardroom_debate: {
+      advisors: advisors,
+      debate_transcript: debateTranscript,
+      consensus_summary: consensusSummary
+    },
     final_note: `This simulation outlines potential scenarios based on a risk profile of ${riskLabel} and a ${personalityLabel} decision-making lens. It represents a theoretical modeling of possibilities using current behavioral heuristics, and is not, under any circumstances, to be considered direct personal, career, financial, or legal advice. Every decision carries unique real-world variables; maintain independent agency and exercise personal caution.`
   };
 }

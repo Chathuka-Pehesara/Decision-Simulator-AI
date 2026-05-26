@@ -1,5 +1,5 @@
 // src/screens/HomeScreen.js
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   StyleSheet, 
   Text, 
@@ -9,7 +9,8 @@ import {
   KeyboardAvoidingView, 
   Platform, 
   SafeAreaView,
-  Alert
+  Alert,
+  Animated
 } from 'react-native';
 import Button from '../components/Button';
 import Dropdown from '../components/Dropdown';
@@ -18,11 +19,42 @@ import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY } from '../styles/theme';
 import { simulateDecision } from '../services/api';
 import { saveSimulation } from '../services/storage';
 
-export default function HomeScreen({ navigation }) {
+export default function HomeScreen({ navigation, route }) {
   const [decision, setDecision] = useState('');
   const [risk, setRisk] = useState('medium');
   const [personality, setPersonality] = useState('balanced');
   const [loading, setLoading] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
+
+  // Animation values
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(40)).current;
+
+  useEffect(() => {
+    // Listen for reframed decisions from ResultScreen
+    if (route.params?.reframedDecision) {
+      setDecision(route.params.reframedDecision);
+      // Clear route parameters so they do not stick on subsequent focus
+      navigation.setParams({ reframedDecision: undefined });
+    }
+  }, [route.params?.reframedDecision]);
+
+  useEffect(() => {
+    // Trigger smooth mounting entry animations
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 700,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        friction: 7,
+        tension: 35,
+        useNativeDriver: Platform.OS !== 'web',
+      })
+    ]).start();
+  }, []);
 
   const riskOptions = [
     { label: 'Low Risk Tolerance', value: 'low' },
@@ -77,73 +109,77 @@ export default function HomeScreen({ navigation }) {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* Header */}
-          <View style={styles.header}>
-            <Text style={styles.title}>Decision Simulator AI</Text>
-            <Text style={styles.subtitle}>
-              Analyze potential pathways. Contrast probabilities. Map emotional impacts.
-            </Text>
-            <View style={styles.decoratorLine} />
-          </View>
+          <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
+            {/* Header */}
+            <View style={styles.header}>
+              <Text style={styles.title}>Decision Simulator AI</Text>
+              <Text style={styles.subtitle}>
+                Analyze potential pathways. Contrast probabilities. Map emotional impacts.
+              </Text>
+              <View style={styles.decoratorLine} />
+            </View>
 
-          {/* Form Card */}
-          <Card style={styles.formCard}>
-            <Text style={styles.inputLabel}>Describe Your Decision</Text>
-            <TextInput
-              style={styles.textInput}
-              multiline
-              numberOfLines={4}
-              placeholder="e.g., Should I accept the senior software engineer offer at the startup, or stay in my stable corporate role?"
-              placeholderTextColor={COLORS.textMuted}
-              value={decision}
-              onChangeText={setDecision}
-              textAlignVertical="top"
-              editable={!loading}
-            />
+            {/* Form Card */}
+            <Card style={styles.formCard}>
+              <Text style={styles.inputLabel}>Describe Your Decision</Text>
+              <TextInput
+                style={[styles.textInput, isFocused && styles.textInputFocused]}
+                multiline
+                numberOfLines={4}
+                placeholder="e.g., Should I accept the senior software engineer offer at the startup, or stay in my stable corporate role?"
+                placeholderTextColor={COLORS.textMuted}
+                value={decision}
+                onChangeText={setDecision}
+                textAlignVertical="top"
+                editable={!loading}
+                onFocus={() => setIsFocused(true)}
+                onBlur={() => setIsFocused(false)}
+              />
 
-            {/* Dropdowns */}
-            <Dropdown
-              label="Risk Tolerance"
-              placeholder="Select risk level..."
-              selectedValue={risk}
-              onValueChange={setRisk}
-              options={riskOptions}
-            />
+              {/* Dropdowns */}
+              <Dropdown
+                label="Risk Tolerance"
+                placeholder="Select risk level..."
+                selectedValue={risk}
+                onValueChange={setRisk}
+                options={riskOptions}
+              />
 
-            <Dropdown
-              label="Personality Focus"
-              placeholder="Select decision style..."
-              selectedValue={personality}
-              onValueChange={setPersonality}
-              options={personalityOptions}
-            />
+              <Dropdown
+                label="Personality Focus"
+                placeholder="Select decision style..."
+                selectedValue={personality}
+                onValueChange={setPersonality}
+                options={personalityOptions}
+              />
 
-            {/* Simulate Button */}
-            <Button
-              title="Simulate Futures"
-              onPress={handleSimulate}
-              loading={loading}
-              style={styles.simulateBtn}
-            />
-          </Card>
+              {/* Simulate Button */}
+              <Button
+                title="Simulate Futures"
+                onPress={handleSimulate}
+                loading={loading}
+                style={styles.simulateBtn}
+              />
+            </Card>
 
-          {/* Navigation Shortcuts */}
-          <View style={styles.shortcutRow}>
-            <Button
-              title="📜 Simulation History"
-              onPress={() => navigation.navigate('History')}
-              variant="light"
-              style={styles.shortcutBtn}
-              textStyle={styles.shortcutText}
-            />
-            <Button
-              title="📊 Compare Scenarios"
-              onPress={() => navigation.navigate('Compare')}
-              variant="light"
-              style={styles.shortcutBtn}
-              textStyle={styles.shortcutText}
-            />
-          </View>
+            {/* Navigation Shortcuts */}
+            <View style={styles.shortcutRow}>
+              <Button
+                title="📜 Simulation History"
+                onPress={() => navigation.navigate('History')}
+                variant="light"
+                style={styles.shortcutBtn}
+                textStyle={styles.shortcutText}
+              />
+              <Button
+                title="📊 Compare Scenarios"
+                onPress={() => navigation.navigate('Compare')}
+                variant="light"
+                style={styles.shortcutBtn}
+                textStyle={styles.shortcutText}
+              />
+            </View>
+          </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -170,43 +206,70 @@ const styles = StyleSheet.create({
   title: {
     ...TYPOGRAPHY.h1,
     color: COLORS.textPrimary,
+    fontWeight: '900',
+    letterSpacing: -0.5,
+    ...Platform.select({
+      web: {
+        background: 'linear-gradient(90deg, #3B82F6 0%, #A855F7 100%)',
+        WebkitBackgroundClip: 'text',
+        WebkitTextFillColor: 'transparent',
+      }
+    })
   },
   subtitle: {
     ...TYPOGRAPHY.body,
     color: COLORS.textSecondary,
-    marginTop: SPACING.xs,
-    lineHeight: 20,
+    marginTop: 6,
+    lineHeight: 22,
+    fontWeight: '500',
   },
   decoratorLine: {
-    width: 48,
-    height: 3,
+    width: 60,
+    height: 4,
     backgroundColor: COLORS.accentBlue,
     borderRadius: BORDER_RADIUS.full,
     marginTop: SPACING.md,
+    shadowColor: COLORS.accentBlue,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 8,
   },
   formCard: {
-    padding: SPACING.md,
+    padding: SPACING.lg,
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+    borderRadius: BORDER_RADIUS.lg,
   },
   inputLabel: {
     ...TYPOGRAPHY.subtext,
-    fontWeight: '600',
+    fontWeight: '700',
     color: COLORS.textSecondary,
-    marginBottom: SPACING.xs,
+    marginBottom: SPACING.sm,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   textInput: {
-    minHeight: 100,
+    minHeight: 110,
     borderWidth: 1.5,
     borderColor: COLORS.border,
     borderRadius: BORDER_RADIUS.md,
     padding: SPACING.md,
     fontSize: 15,
     color: COLORS.textPrimary,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.surface, // Obsidian dark inset layer
     marginBottom: SPACING.md,
-    lineHeight: 20,
+    lineHeight: 22,
+  },
+  textInputFocused: {
+    borderColor: COLORS.accentBlue,
+    shadowColor: COLORS.accentBlue,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
   },
   simulateBtn: {
     marginTop: SPACING.sm,
+    height: 52,
   },
   shortcutRow: {
     flexDirection: 'row',
@@ -215,10 +278,10 @@ const styles = StyleSheet.create({
   },
   shortcutBtn: {
     flex: 1,
-    height: 44,
+    height: 48,
   },
   shortcutText: {
     fontSize: 13,
-    fontWeight: '500',
+    fontWeight: '700',
   },
 });

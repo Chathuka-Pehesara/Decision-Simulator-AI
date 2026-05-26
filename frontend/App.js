@@ -23,7 +23,7 @@ export default function App() {
         initialRouteName="Home"
         screenOptions={{
           headerStyle: {
-            backgroundColor: '#FFFFFF',
+            backgroundColor: COLORS.surface,
           },
           headerShadowVisible: false, // Standard premium border instead of heavy shadow
           headerTitleStyle: {

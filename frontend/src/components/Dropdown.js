@@ -110,16 +110,18 @@ const styles = StyleSheet.create({
   },
   label: {
     ...TYPOGRAPHY.subtext,
-    fontWeight: '600',
+    fontWeight: '700',
     color: COLORS.textSecondary,
     marginBottom: SPACING.xs,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   trigger: {
-    height: 50,
+    height: 52,
     borderWidth: 1.5,
     borderColor: COLORS.border,
     borderRadius: BORDER_RADIUS.md,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.surface,
     paddingHorizontal: SPACING.md,
     flexDirection: 'row',
     alignItems: 'center',
@@ -127,14 +129,15 @@ const styles = StyleSheet.create({
   },
   triggerText: {
     ...TYPOGRAPHY.body,
-    fontWeight: '500',
+    fontWeight: '600',
+    color: COLORS.textPrimary,
   },
   placeholder: {
     color: COLORS.textMuted,
   },
   arrow: {
-    fontSize: 10,
-    color: COLORS.textSecondary,
+    fontSize: 11,
+    color: COLORS.accentBlue,
   },
   modalOverlay: {
     flex: 1,
@@ -145,9 +148,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   modalContent: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.card,
     borderTopLeftRadius: BORDER_RADIUS.lg,
     borderTopRightRadius: BORDER_RADIUS.lg,
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
     maxHeight: '50%',
   },
   safeArea: {
@@ -159,20 +164,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
-    borderBottomWidth: 1,
+    borderBottomWidth: 1.5,
     borderBottomColor: COLORS.divider,
   },
   modalTitle: {
     ...TYPOGRAPHY.h3,
-    fontWeight: '700',
+    fontWeight: '800',
+    color: COLORS.textPrimary,
   },
   closeButton: {
     padding: SPACING.xs,
   },
   closeButtonText: {
-    fontSize: 16,
+    fontSize: 18,
     color: COLORS.textSecondary,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   listContent: {
     paddingHorizontal: SPACING.md,
@@ -184,7 +190,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.sm,
-    borderRadius: BORDER_RADIUS.sm,
+    borderRadius: BORDER_RADIUS.md,
   },
   optionItemActive: {
     backgroundColor: COLORS.accentBlueLight,
@@ -192,10 +198,11 @@ const styles = StyleSheet.create({
   optionText: {
     ...TYPOGRAPHY.body,
     color: COLORS.textPrimary,
+    fontWeight: '500',
   },
   optionTextActive: {
     color: COLORS.accentBlue,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   checkmark: {
     fontSize: 16,

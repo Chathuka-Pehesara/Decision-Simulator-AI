@@ -1,34 +1,34 @@
 // src/styles/theme.js
 
 export const COLORS = {
-  background: '#FFFFFF',
-  surface: '#F8F9FA',      // Very light gray for backgrounds or subtle card divisions
-  card: '#FFFFFF',
+  background: '#090D16',    // Deep cosmic space dark blue
+  surface: '#151D2F',       // Sleek dark glass layer
+  card: '#0F1524',          // Rich obsidian dark card
   
   // Typography
-  textPrimary: '#0E0E10',   // Deep black for headers and main content
-  textSecondary: '#4B5563', // Slate gray for descriptions and helper text
-  textMuted: '#9CA3AF',     // Muted gray for timestamps and borders
+  textPrimary: '#F8FAFC',   // Crisp, high-end white-blue
+  textSecondary: '#94A3B8', // Slate grey for subtitles
+  textMuted: '#64748B',     // Cool muted steel grey
   
   // Accent Colors
-  accentBlue: '#0066FF',    // Electric Blue (Primary Action)
-  accentGreen: '#00B074',   // Emerald Green (Success, High Probability)
-  accentBlueLight: '#E6F0FF', // Very light blue for selected states or badges
-  accentGreenLight: '#E6F7F1', // Very light green for positive badges
+  accentBlue: '#3B82F6',    // Vibrant electric neon blue
+  accentGreen: '#10B981',   // Neon emerald green
+  accentBlueLight: 'rgba(59, 130, 246, 0.12)', // Subtle neon blue aura
+  accentGreenLight: 'rgba(16, 185, 129, 0.12)', // Subtle neon green aura
   
   // Risk levels
-  riskLow: '#00B074',
-  riskLowBg: '#E6F7F1',
-  riskMedium: '#0066FF',
-  riskMediumBg: '#E6F0FF',
-  riskHigh: '#374151',      // Dark slate gray to remain neutral and avoid banned colors
-  riskHighBg: '#F3F4F6',    // Light gray bg for high risk
+  riskLow: '#10B981',
+  riskLowBg: 'rgba(16, 185, 129, 0.12)',
+  riskMedium: '#3B82F6',
+  riskMediumBg: 'rgba(59, 130, 246, 0.12)',
+  riskHigh: '#F43F5E',      // Rose-crimson red
+  riskHighBg: 'rgba(244, 63, 94, 0.12)',
   
   // UI Details
-  border: '#EBEBEB',
-  borderDark: '#D1D5DB',
-  divider: '#F3F4F6',
-  overlay: 'rgba(0, 0, 0, 0.4)',
+  border: 'rgba(255, 255, 255, 0.08)',  // Sleek glassy micro-borders
+  borderDark: 'rgba(255, 255, 255, 0.15)',
+  divider: 'rgba(255, 255, 255, 0.05)',
+  overlay: 'rgba(0, 0, 0, 0.75)',
 };
 
 export const SPACING = {
@@ -42,18 +42,18 @@ export const SPACING = {
 
 export const SHADOWS = {
   light: {
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2, // Android elevation
+    shadowColor: '#3B82F6', // Sleek electric glow
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 3,
   },
   medium: {
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
+    shadowColor: '#3B82F6',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    elevation: 6,
   },
 };
 
