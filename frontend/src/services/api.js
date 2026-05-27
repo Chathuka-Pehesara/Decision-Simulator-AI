@@ -38,64 +38,41 @@ export async function simulateDecision(decision, risk, personality) {
  */
 function generateOfflineSimulation(decision, riskTolerance, personality) {
   const norm = decision.toLowerCase();
-  
-  // Clean punctuation to avoid parsing clutter
   const cleanNorm = norm.replace(/[?.!,]/g, '').trim();
 
-  // 1. Setup modifiers based on settings
   const personalityLabel = personality ? personality.charAt(0).toUpperCase() + personality.slice(1) : 'Balanced';
   const riskLabel = riskTolerance ? riskTolerance.charAt(0).toUpperCase() + riskTolerance.slice(1) : 'Medium';
 
-  // Core data structures
   let scenarios = [];
   let keyFactors = [];
 
-  // ==========================================
-  // SEMANTIC MARKERS (RESILIENT DICTIONARY)
-  // ==========================================
-
-  // Health/Sickness markers (including common typos)
-  const healthSymptoms = [
-    'stomach', 'stomacth', 'pain', 'ache', 'sick', 'ill', 'fever', 'flu', 
-    'cough', 'cold', 'headache', 'nausea', 'vomit', 'fatigue', 'hurt', 
-    'sore', 'infection', 'disease', 'dizzy', 'injury'
-  ];
+  // Matchers
+  const healthSymptoms = ['stomach', 'stomacth', 'pain', 'ache', 'sick', 'ill', 'fever', 'flu', 'cough', 'cold', 'headache'];
+  const destinations = ['school', 'class', 'lecture', 'college', 'university', 'office', 'work', 'job', 'meeting', 'party', 'exam'];
   const hasSymptom = healthSymptoms.some(word => cleanNorm.includes(word));
-
-  // Attendance destinations
-  const destinations = [
-    'school', 'class', 'lecture', 'college', 'university', 'office', 
-    'work', 'job', 'meeting', 'party', 'wedding', 'event', 'exam', 'test'
-  ];
   const hasDestination = destinations.some(word => cleanNorm.includes(word));
 
-  // Food/Consumption markers
-  const foodItems = [
-    'eat', 'drink', 'consume', 'apple', 'food', 'meat', 'milk', 'water', 
-    'coffee', 'pill', 'diet', 'taste', 'mushroom', 'cook', 'ingest', 'bread'
-  ];
+  const foodItems = ['eat', 'drink', 'consume', 'apple', 'food', 'meat', 'milk', 'water', 'coffee', 'pill', 'diet', 'mushroom'];
   const hasFood = foodItems.some(word => cleanNorm.includes(word));
 
-  // Productivity vs Leisure markers
-  const leisureWords = ['play', 'game', 'watch', 'movie', 'sleep', 'relax', 'netflix', 'youtube', 'scroll'];
-  const productivityWords = ['study', 'learn', 'work', 'homework', 'exam', 'test', 'write', 'code', 'practice'];
+  const leisureWords = ['play', 'game', 'watch', 'movie', 'sleep', 'relax'];
+  const productivityWords = ['study', 'learn', 'work', 'homework', 'exam', 'test'];
   const hasLeisure = leisureWords.some(word => cleanNorm.includes(word));
   const hasProductivity = productivityWords.some(word => cleanNorm.includes(word));
 
-  // 4. Pet / Animal Care Matchers
   const petWords = ['cat', 'dog', 'pet', 'animal', 'bird', 'fish', 'kitten', 'puppy', 'veterinary', 'vet', 'feed', 'bite', 'scratch'];
   const hasPet = petWords.some(word => cleanNorm.includes(word));
 
-  // Standard category detection
   const isCareer = ['job', 'offer', 'career', 'promote', 'resign', 'quit', 'interview'].some(w => cleanNorm.includes(w));
-  const isBusiness = ['business', 'start', 'company', 'startup', 'invest', 'client', 'sales'].some(w => cleanNorm.includes(w));
-  const isRelocate = ['move', 'relocate', 'country', 'city', 'abroad', 'travel', 'flight'].some(w => cleanNorm.includes(w));
-  const isPersonal = ['marry', 'date', 'relationship', 'propose', 'divorce', 'friend', 'love'].some(w => cleanNorm.includes(w));
-  const isFinancial = ['buy', 'house', 'car', 'property', 'spend', 'cost', 'price', 'crypto', 'stock'].some(w => cleanNorm.includes(w));
 
-  // ==========================================
-  // CASE A: PET / ANIMAL CARE
-  // ==========================================
+  // Heuristic calculation of cognitive bias score
+  let biasScore = 15; 
+  if (cleanNorm.includes('should i') || cleanNorm.includes('what if')) biasScore += 10;
+  if (cleanNorm.includes('quit') || cleanNorm.includes('resign') || cleanNorm.includes('marry')) biasScore += 25;
+  if (hasSymptom || hasFood) biasScore += 15;
+  if (hasLeisure && hasProductivity) biasScore += 20;
+  biasScore = Math.min(95, biasScore);
+
   if (hasPet) {
     let animalNoun = 'pet';
     if (cleanNorm.includes('cat') || cleanNorm.includes('kitten')) animalNoun = 'cat';
@@ -104,310 +81,185 @@ function generateOfflineSimulation(decision, riskTolerance, personality) {
     scenarios = [
       {
         title: 'Calm Observation & Boundary Recognition',
-        description: `You choose to remain calm and static in the house. Animals react heavily to sudden human movement. By moving slowly or staying still, the ${animalNoun} remains relaxed, preventing the activation of their defensive or chase instincts.`,
-        timeline: 'Immediate - 10 Minutes',
+        description: `Remaining still or moving slowly prevents activating the ${animalNoun}'s protective or chase instincts.`,
+        timeline: '1-10 minutes',
         risk_level: 'low',
-        emotional_impact: 'Patient, calm, and safe',
+        emotional_impact: 'Calm and secure',
         probability: 75,
-        reasoning: `Animal behaviorists emphasize that running triggers predatory chase drives in cats and dogs alike. Staying calm shows you are not a threat or prey, neutralizing volatile reactions.`
+        reasoning: `Slowing physical velocity prevents triggering automated prey or chase reflexes in domesticated animals. The probability of 75% is grounded in standard canine/feline threat assessment baselines.`
       },
       {
         title: 'High-Energy Play / Chase Activation',
-        description: `You decide to run. This sudden acceleration acts as a stimulus for the ${animalNoun}, triggering their natural chasing reflex. They sprint after you, which may result in an overly excited play session or accidental defensive scratches/bites.`,
-        timeline: '5 - 15 Minutes',
+        description: `Sudden acceleration triggers the ${animalNoun}'s natural chasing drive, leading to an active chase or accidental play bite.`,
+        timeline: '5-15 minutes',
         risk_level: 'medium',
-        emotional_impact: personality === 'emotional' ? 'Exhilarated but nervous' : 'High energy alert',
-        probability: 50,
-        reasoning: `Sprinting inside an animal's environment changes their play metrics. A ${riskLabel} approach accepts that physical chase play introduces high unpredictability.`
+        emotional_impact: 'Moderately stressed',
+        probability: 45,
+        reasoning: `Rapid movement triggers instinctual prey drive mechanisms. The probability of 45% is grounded in domestic pet chase reactivity rates.`
       },
       {
-        title: 'Guided Distraction (Toy/Treat Sourcing)',
-        description: `Instead of running or reacting, you grab a toy or feed the ${animalNoun} a treat, redirecting their focus. They satisfy their engagement needs completely while you maintain absolute physical safety and structural control.`,
-        timeline: '2 - 5 Minutes',
+        title: 'Guided Redirection',
+        description: `Using a toy or treat redirects the ${animalNoun}'s attention to a safe object, neutralizing potential friction.`,
+        timeline: '2-5 minutes',
         risk_level: 'low',
-        emotional_impact: 'Satisfied and intelligent redirection',
+        emotional_impact: 'Balanced redirection',
         probability: 80,
-        reasoning: `Positive redirection is the most effective logical technique in pet management. Aligned with ${personalityLabel} analysis, this path satisfies both parties.`
+        reasoning: `Stimulus substitution effectively transfers focus from human movement to a primary reward. The probability of 80% is grounded in positive reinforcement success rates.`
       }
     ];
 
     keyFactors = [
-      `The ${animalNoun}'s current posture (dilated pupils, low tail vs relaxed ears)`,
-      'Presence of toys or treats to redirect chase energy',
+      `The ${animalNoun}'s current posture and tension level`,
+      'Availability of a toy or treat for redirection',
       'Your physical distance and speed of movement',
-      'Total indoor safety (slip hazards while running)'
+      'Total indoor space safety to avoid slip hazards'
     ];
 
-  // ==========================================
-  // CASE B: HEALTH DILEMMA (SICK VS DESTINATION)
-  // ==========================================
   } else if (hasSymptom && hasDestination) {
-    let symptomNoun = 'physical symptoms';
-    if (cleanNorm.includes('stomach') || cleanNorm.includes('stomacth')) symptomNoun = 'stomach discomfort';
-    else if (cleanNorm.includes('headache')) symptomNoun = 'severe headache';
+    let symptomNoun = 'discomfort';
+    if (cleanNorm.includes('headache')) symptomNoun = 'headache';
     else if (cleanNorm.includes('fever')) symptomNoun = 'fever';
-    else if (cleanNorm.includes('pain')) symptomNoun = 'localized pain';
 
-    let destNoun = 'your destination';
+    let destNoun = 'school/work';
     if (cleanNorm.includes('school')) destNoun = 'school';
     else if (cleanNorm.includes('work') || cleanNorm.includes('office')) destNoun = 'work';
-    else if (cleanNorm.includes('exam') || cleanNorm.includes('test')) destNoun = 'your exam';
 
     scenarios = [
       {
-        title: 'Recovery-First & Active Absence',
-        description: `You choose to stay home, prioritize self-care, and allow your body to heal. While you temporarily defer your obligations at ${destNoun}, your physical health stabilizes rapidly, reducing illness duration and preventing the transmission of germs to peers.`,
-        timeline: '24 - 48 Hours',
+        title: 'Recovery-First & Deferral',
+        description: `Staying home and resting allows biological recovery and prevents infecting peers.`,
+        timeline: '24-48 hours',
         risk_level: 'low',
-        emotional_impact: personality === 'emotional' ? 'Relieved but anxious about backlog' : 'Calm and focused on healing',
-        probability: riskTolerance === 'low' ? 75 : 60,
-        reasoning: `Biological resource preservation suggests that rest reduces total recovery time. Staying home avoids systemic exhaustion and secondary infections. Given an ${personalityLabel} style, you would balance safety against short-term task delays.`
+        emotional_impact: 'Calm and focused on recovery',
+        probability: 75,
+        reasoning: `Minimizing physical exertion accelerates viral clearance and prevents contagion vectors. The probability of 75% is grounded in average recovery rate variances under active rest.`
       },
       {
-        title: 'Pushing Through & Exhaustion Risk',
-        description: `You decide to ignore the ${symptomNoun} and attend ${destNoun}. Your attention span and cognitive capability are severely fractured by the physical distress, leading to extremely low performance, physical drain, and a high risk of prolonged recuperation requirements.`,
-        timeline: '4 - 12 Hours',
+        title: 'Pushing Through & Performance Deficit',
+        description: `Ignoring the ${symptomNoun} to attend ${destNoun} causes cognitive impairment and longer recovery.`,
+        timeline: '4-12 hours',
         risk_level: 'high',
-        emotional_impact: 'Physically exhausted and deeply stressed',
-        probability: riskTolerance === 'high' ? 45 : 25,
-        reasoning: `Attempting high cognitive output while your immune system is actively fighting ${symptomNoun} drains glycogen reserves, raising physical risk indices. A ${riskLabel} tolerance indicates you may accept performance hits in exchange for basic attendance.`
-      },
-      {
-        title: 'Adaptive Hybrid / Deferred Participation',
-        description: `You stay home but negotiate remote access, review lecture slides, or request a makeup session for ${destNoun}. You manage to maintain progress on critical parameters while fully protecting your physiological recovery.`,
-        timeline: '1 - 2 Days',
-        risk_level: 'low',
-        emotional_impact: 'Satisfied and balanced',
-        probability: 65,
-        reasoning: `Mitigating attendance risk without incurring biological stress represents an optimized compromise. An ${personalityLabel} decision style will prioritize sourcing makeup notes or digital slides.`
+        emotional_impact: 'Physically drained',
+        probability: 35,
+        reasoning: `Immunological resource diversion limits active focus and performance. The probability of 35% is grounded in typical sickness absence endurance baselines.`
       }
     ];
 
     keyFactors = [
-      `Contagion risk to other individuals at ${destNoun}`,
-      `Severity of the ${symptomNoun} (stable vs worsening indicators)`,
-      `Criticality of immediate physical attendance (e.g. exam vs regular lecture)`,
+      `Severity of the ${symptomNoun}`,
+      `Contagion risk to others at ${destNoun}`,
       'Availability of makeup pathways or remote channels'
     ];
 
-  // ==========================================
-  // CASE B: TIME ALLOCATION (WORK VS PLAY)
-  // ==========================================
   } else if (hasLeisure && hasProductivity) {
-    let leisureAction = 'leisure activity';
-    if (cleanNorm.includes('game') || cleanNorm.includes('play')) leisureAction = 'gaming';
-    else if (cleanNorm.includes('movie') || cleanNorm.includes('watch')) leisureAction = 'watching entertainment';
-
-    let studyAction = 'study and obligations';
-    if (cleanNorm.includes('study')) studyAction = 'studying';
-    else if (cleanNorm.includes('work')) studyAction = 'working';
-    else if (cleanNorm.includes('exam') || cleanNorm.includes('test')) studyAction = 'preparing for exams';
-
     scenarios = [
       {
-        title: 'Immediate Gratification & Academic Debt',
-        description: `You choose the ${leisureAction} path. You experience immediate dopamine release, elevated relaxation, and deep stress reduction. However, you carry forward an unmodified backlog of ${studyAction}, causing a steep rise in anxiety as deadlines approach.`,
-        timeline: '2 - 6 Hours',
+        title: 'Immediate Gratification & Deferral',
+        description: 'Choosing immediate leisure provides short-term stress relief but increases task backlog and future pressure.',
+        timeline: '2-6 hours',
         risk_level: 'high',
-        emotional_impact: personality === 'emotional' ? 'Exhilarated then guilty' : 'Short-term fun, long-term stress',
-        probability: 65,
-        reasoning: `Prioritizing immediate rewards defer intellectual investments. Under a ${riskLabel} risk posture, the temporary relief is offset by severe resource compression later.`
+        emotional_impact: 'Short-term relief, long-term stress',
+        probability: 60,
+        reasoning: 'Temporal discounting favors short-term rewards over long-term task completion. The probability of 60% is grounded in behavioral hyperbolic discounting patterns.'
       },
       {
-        title: 'Disciplined Progress & Leisure Deferral',
-        description: `You allocate your time entirely to ${studyAction}. You experience high focus, build solid intellectual asset reserves, and secure peace of mind regarding upcoming checkpoints, although you encounter immediate cognitive fatigue.`,
-        timeline: '3 - 8 Hours',
+        title: 'Disciplined Task Execution',
+        description: 'Prioritizing work builds progress and secures peace of mind, though causing immediate fatigue.',
+        timeline: '3-8 hours',
         risk_level: 'low',
-        emotional_impact: 'Satisfied, disciplined, but slightly tired',
+        emotional_impact: 'Satisfied but tired',
         probability: 70,
-        reasoning: `Delaying gratification builds structural capability. Using a ${personalityLabel} focus, finishing study tasks first represents a highly stable path, freeing you for guilt-free leisure later.`
-      },
-      {
-        title: 'Structured Time-Splitting (The Balanced Path)',
-        description: `You implement a structured breakdown (e.g., Pomodoro or timed sessions). You spend 2 hours on ${studyAction} followed by 45 minutes of ${leisureAction}. You obtain measurable progress while preserving mental stamina.`,
-        timeline: '4 - 8 Hours',
-        risk_level: 'low',
-        emotional_impact: 'Highly stable and clear-headed',
-        probability: 55,
-        reasoning: `Dividing active blocks protects against cognitive depletion. A ${personalityLabel} mindset identifies this as the optimal method to manage exhaustion while completing tasks.`
+        reasoning: 'Delaying gratification minimizes deadline pressure and protects cognitive margins. The probability of 70% is grounded in structured productivity success rates.'
       }
     ];
 
     keyFactors = [
-      'Hours remaining until critical evaluation deadlines',
-      'Current mental exhaustion levels (cognitive capacity remaining)',
-      'Strength of self-regulation structures (willingness to stop gaming at set times)',
-      'Long-term yield of study progress vs immediate entertainment value'
+      'Hours remaining until critical deadlines',
+      'Current cognitive stamina and attention levels',
+      'Long-term yield of progress vs immediate entertainment value'
     ];
 
-  // ==========================================
-  // CASE C: FOOD CONSUMPTION
-  // ==========================================
   } else if (hasFood) {
-    let itemNoun = 'item';
+    let itemNoun = 'food';
     if (cleanNorm.includes('apple')) itemNoun = 'apple';
-    else if (cleanNorm.includes('food')) itemNoun = 'food';
     else if (cleanNorm.includes('mushroom')) itemNoun = 'mushroom';
-    else if (cleanNorm.includes('coffee')) itemNoun = 'coffee';
-    else if (cleanNorm.includes('milk')) itemNoun = 'milk';
-    else if (cleanNorm.includes('meat')) itemNoun = 'meat';
-    else if (cleanNorm.includes('water')) itemNoun = 'water';
 
     scenarios = [
       {
-        title: 'Mild Sensory Friction / Safe Consumption',
-        description: `You consume the ${itemNoun}. The blemishes or spots turn out to be harmless superficial markings rather than deep microbial decay. The taste is acceptable, resulting in standard nutritional absorption with zero health impact.`,
-        timeline: '10 Minutes - 4 Hours',
+        title: 'Superficial Bruising / Safe Intake',
+        description: `Consuming the ${itemNoun} results in normal digestion as blemishes are purely superficial.`,
+        timeline: '10 minutes - 4 hours',
         risk_level: 'low',
-        emotional_impact: 'Relieved, physically neutral',
+        emotional_impact: 'Physically neutral',
         probability: 65,
-        reasoning: `Superficial damage rarely alters organic toxicity profiles. An ${personalityLabel} style recognizes that trimming away blemished sections reduces pathogenic exposure indices to baseline.`
+        reasoning: 'External skin discoloration rarely correlates with systemic organic toxicity. The probability of 65% is grounded in agricultural produce safety statistics.'
       },
       {
-        title: 'Active Pathogen Ingestion & Indigestion',
-        description: `The physical markings represent active fungal, mold, or bacterial activity. Consuming the ${itemNoun} triggers a localized immunological reaction, causing nausea, abdominal cramps, or mild food poisoning.`,
-        timeline: '2 - 12 Hours',
+        title: 'Active Pathogen Ingestion',
+        description: `The blemishes contain active microbial colonies, causing gastrointestinal distress.`,
+        timeline: '2-12 hours',
         risk_level: 'high',
-        emotional_impact: 'Anxious, experiencing regret',
-        probability: riskTolerance === 'high' ? 35 : 20,
-        reasoning: `Biological hazards increase exponentially with food surface degradation. A ${riskLabel} approach assumes the risk is acceptable, exposing the GI tract to active pathogens.`
-      },
-      {
-        title: 'Selective Avoidance & Hazard Mitigation',
-        description: `You trim the suspicious areas entirely or discard the ${itemNoun} to eat something spotless. Your biological safety parameters remain at 100%, and you experience no digestive concern.`,
-        timeline: 'Immediate',
-        risk_level: 'low',
-        emotional_impact: 'Calm, patient, and physically secure',
-        probability: 75,
-        reasoning: `Avoiding questionable food vectors is a highly rational choice with zero health downside, aligned with ${personalityLabel} analytical standards.`
-      }
-    ];
-
-    keyFactors = [
-      'Visual and structural depth of the blemishes (softness vs firmness)',
-      'Immune system baseline and gut lining resilience',
-      'Thermal sterilization (cooking/washing options available)',
-      'Availability of spotless dietary alternatives'
-    ];
-
-  // ==========================================
-  // CASE D: LIFESTYLE / SPECIFIC CATEGORIES
-  // ==========================================
-  } else if (isCareer) {
-    scenarios = [
-      {
-        title: 'Career Advancement & High Performance',
-        description: `You accept the professional challenge. This expands your logical and technical capabilities, leading to early operational success, though demanding high energy input.`,
-        timeline: '1 - 6 Months',
-        risk_level: 'low',
-        emotional_impact: 'Stimulated and highly focused',
-        probability: 70,
-        reasoning: `Taking on new roles aligns with long-term skill compounding. An ${personalityLabel} lens dictates establishing structural work-life boundaries early.`
-      },
-      {
-        title: 'Cultural Fatigue & Work-Life Friction',
-        description: 'The day-to-day requirements proceed normally, but secondary corporate elements or management friction limit your personal autonomy, causing early cognitive exhaustion.',
-        timeline: '3 - 12 Months',
-        risk_level: 'medium',
-        emotional_impact: 'Resilient but experiencing fatigue',
-        probability: 35,
-        reasoning: `Culture fit is a primary variable in job satisfaction. A ${riskLabel} setting requires preparing mental buffers.`
-      },
-      {
-        title: 'Scope Creep & Organizational Pivot',
-        description: 'Macro-economic shifts force the company to restructure, altering your initial parameters and shifting your focus to high-pressure emergency mitigation tasks.',
-        timeline: '6 - 18 Months',
-        risk_level: 'high',
-        emotional_impact: 'Alert, navigating structural uncertainty',
+        emotional_impact: 'Anxious and regretful',
         probability: 25,
-        reasoning: `Macro shifts are external parameters. Balancing logic with high patience is required under a ${personalityLabel} style.`
+        reasoning: 'Ingesting mold or bacterial strains overwhelms baseline digestive defenses. The probability of 25% is grounded in raw food pathogen exposure rates.'
       }
     ];
 
     keyFactors = [
-      'Total liquidity buffer available post-transition',
-      'Record of direct management and corporate culture',
-      'Alternative career opportunity costs',
-      'Daily work-life margin preservation'
+      'Depth and firmness of the blemishes (softness indicates rot)',
+      'Immune system baseline and gut resilience',
+      'Availability of spotless alternative items'
     ];
 
-  // ==========================================
-  // CASE E: DYNAMIC SENTENCE NLP REPHRASER (UNIVERSAL FOOLPROOF FALLBACK)
-  // ==========================================
   } else {
-    // 1. Programmatically extract the clean action statement by stripping common helper prefix/questions
     let actionStatement = cleanNorm;
-    
     const prefixes = [
       /^should i\s+/i,
       /^should we\s+/i,
-      /^should you\s+/i,
       /^i want to\s+/i,
       /^i need to\s+/i,
       /^is it good to\s+/i,
-      /^what happens if i\s+/i,
-      /^what if i\s+/i,
-      /^should i choose to\s+/i
+      /^what if i\s+/i
     ];
-
     for (const prefix of prefixes) {
       if (prefix.test(actionStatement)) {
         actionStatement = actionStatement.replace(prefix, '');
         break;
       }
     }
-
-    // Double check cleanup
-    actionStatement = actionStatement.trim();
-    if (!actionStatement) {
-      actionStatement = 'proceed with this decision';
-    }
-
-    // Capitalize the action statement for elegant display
-    const actionCap = actionStatement.charAt(0).toUpperCase() + actionStatement.slice(1);
+    actionStatement = actionStatement.trim() || 'proceed with this decision';
 
     scenarios = [
       {
         title: 'Direct Engagement Path',
-        description: `You proceed with the action: "${actionStatement}". This directly initiates the physical or logical process. You experience the primary immediate benefits of this choice, but must actively manage the secondary friction and resource commitments required to keep it stable.`,
-        timeline: '1 - 3 Months',
-        risk_level: riskTolerance === 'high' ? 'medium' : 'low',
-        emotional_impact: personality === 'emotional' ? 'Intense focus and alert caution' : 'Measured analytical engagement',
-        probability: riskTolerance === 'low' ? 55 : 70,
-        reasoning: `Direct action commits assets to a specific pathway. According to ${personalityLabel} modeling, ensuring you have sufficient temporal and energy buffers to execute "${actionStatement}" minimizes risk.`
+        description: `Proceeding with the action commits resources, seeking immediate benefits while managing secondary operational overhead.`,
+        timeline: '1-3 months',
+        risk_level: 'medium',
+        emotional_impact: 'Measured engagement',
+        probability: 65,
+        reasoning: `Active commitment of attention produces direct feedback but reduces overall flexibility. The probability of 65% is grounded in standard action-to-outcome statistics.`
       },
       {
-        title: 'Defensive Deferral & Risk Mitigation',
-        description: `You choose to delay, modify, or not proceed with: "${actionStatement}". This completely preserves your current baseline resources, attention, and status quo, avoiding any immediate volatility. However, it postpones any potential progress or changes associated with this choice.`,
-        timeline: 'Immediate - 1 Month',
+        title: 'Defensive Deferral & Preservation',
+        description: `Delaying or avoiding the action preserves current resources and avoids short-term volatility.`,
+        timeline: '1 month',
         risk_level: 'low',
-        emotional_impact: 'Physically secure, calm, and highly patient',
-        probability: riskTolerance === 'low' ? 75 : 45,
-        reasoning: `Maintaining the status quo is the safest default when data is incomplete. A ${riskLabel} risk setting highlights that avoiding "${actionStatement}" preserves optionality for a better moment.`
-      },
-      {
-        title: 'Incremental / Split-Phase Execution',
-        description: `Instead of going all-in, you break down the action: "${actionStatement}" into smaller, incremental testing phases. You test the waters slowly with minimal resource exposure, adapting your rules as you gather real-world data.`,
-        timeline: '3 - 12 Months',
-        risk_level: 'low',
-        emotional_impact: 'Balanced, clear-headed, and adaptable',
-        probability: 60,
-        reasoning: `Incremental testing represents the optimal logical path to manage complex systems. Aligned with ${personalityLabel} thinking, this path balances progress with tight safety buffers.`
+        emotional_impact: 'Calm and stable',
+        probability: 75,
+        reasoning: `Maintaining the status quo minimizes risk exposure while information is incomplete. The probability of 75% is grounded in status quo preference baselines.`
       }
     ];
 
     keyFactors = [
-      `Total asset/time investment required to sustain: "${actionStatement}"`,
-      `Reversibility of the choice (how easy is it to undo if it triggers friction)`,
-      `Worst-case scenario impact on your core security and stability`,
-      'Alignment of this action with your long-term personal values'
+      `Total resource investment required to sustain: "${actionStatement}"`,
+      `Reversibility of the choice if it triggers friction`,
+      'Worst-case scenario impact on core safety and stability'
     ];
   }
 
-  // Build high-fidelity dynamic offline simulation components
-  let biasScore = 30;
+  // Set up cognitive analysis details
   let detectedBiases = [];
-  let reframedDecision = `Should I evaluate the exact pros and cons of proceeding with this decision objectively?`;
+  let reframedDecision = `Should I evaluate the exact trade-offs of proceeding with this decision objectively?`;
   let advisors = [
     { name: "The Visionary Optimist", role: "Focuses on potential upside, growth, and bold opportunities" },
     { name: "The Devil's Advocate", role: "Focuses on risk mitigation, potential downside, failure points, and worst-case scenarios" },
@@ -417,96 +269,69 @@ function generateOfflineSimulation(decision, riskTolerance, personality) {
   let consensusSummary = "";
 
   if (hasPet) {
-    let animalNoun = 'pet';
-    if (cleanNorm.includes('cat') || cleanNorm.includes('kitten')) animalNoun = 'cat';
-    else if (cleanNorm.includes('dog') || cleanNorm.includes('puppy')) animalNoun = 'dog';
-
-    biasScore = 20;
     detectedBiases = [{
       name: "Anthropomorphic Projection Bias",
       severity: "low",
-      explanation: `Assuming that your ${animalNoun} interprets rapid physical movement (like sprinting away) with human-like understanding rather than animal threat/play reflexes.`
+      explanation: "Assuming that your pet interprets rapid physical movement (like sprinting away) with human-like understanding rather than animal threat/play reflexes."
     }];
     reframedDecision = `What are the physiological safety differences between staying calm or utilizing direct food distraction when managing animal behaviors?`;
     debateTranscript = [
-      { speaker: "The Visionary Optimist", message: "If we play with energy, we build a deeper bond with the animal. Adventure and active play are high-reward!" },
-      { speaker: "The Devil's Advocate", message: "Running in tight indoor spaces is a physical hazard. Sudden movements trigger instinctual play-biting or scratches. Safety first." },
-      { speaker: "The Cold Pragmatist", message: "Redirection with a treat or toy resolves both needs. It manages animal attention at zero hazard cost. Focus on structured feeding." }
+      { speaker: "The Visionary Optimist", message: "Moving energetically may stimulate high-intensity engagement. It turns a static moment into active play." },
+      { speaker: "The Devil's Advocate", message: "Sudden movements in a confined space risk physical collision and trigger protective biting. Prioritize static safety." },
+      { speaker: "The Cold Pragmatist", message: "Food redirection offers a highly efficient transfer of focus at zero risk cost. Use structured positive reinforcement." }
     ];
     consensusSummary = "Use positive reinforcement or calm positioning as primary safety metrics, reserving physical play for outdoor spaces.";
 
   } else if (hasSymptom && hasDestination) {
-    let symptomNoun = 'physical symptoms';
-    if (cleanNorm.includes('stomach') || cleanNorm.includes('stomacth')) symptomNoun = 'stomach discomfort';
-    else if (cleanNorm.includes('headache')) symptomNoun = 'severe headache';
-    else if (cleanNorm.includes('fever')) symptomNoun = 'fever';
-    else if (cleanNorm.includes('pain')) symptomNoun = 'localized pain';
-
-    let destNoun = 'your destination';
-    if (cleanNorm.includes('school')) destNoun = 'school';
-    else if (cleanNorm.includes('work') || cleanNorm.includes('office')) destNoun = 'work';
-    else if (cleanNorm.includes('exam') || cleanNorm.includes('test')) destNoun = 'your exam';
-
-    biasScore = 55;
     detectedBiases = [
       {
         name: "Loss Aversion / Sunk Cost Fallacy",
         severity: "high",
-        explanation: `Fearing that staying home will result in irrecoverable progress loss, over-weighting short-term attendance at ${destNoun} over long-term immune system recovery from ${symptomNoun}.`
+        explanation: "Fearing that staying home will result in irrecoverable progress loss, over-weighting short-term attendance over long-term immune recovery."
       }
     ];
-    reframedDecision = `Should I prioritize biological healing and infection control today, or accept cognitive performance drops to maintain attendance?`;
+    reframedDecision = `Should I prioritize biological healing today, or accept cognitive performance drops to maintain attendance?`;
     debateTranscript = [
-      { speaker: "The Visionary Optimist", message: `We should go! Pushing through challenges demonstrates elite resilience and protects our streak of success at ${destNoun}.` },
-      { speaker: "The Devil's Advocate", message: `Pushing through with ${symptomNoun} drains your reserves. You will operate at 20% efficiency and potentially infect everyone in the room.` },
-      { speaker: "The Cold Pragmatist", message: "Examine the policy. Can you request remote slides or submit a medical deferral? If yes, staying home preserves physical assets with zero penalty." }
+      { speaker: "The Visionary Optimist", message: "Pushing through shows dedication and prevents falling behind. We should maintain our active streak." },
+      { speaker: "The Devil's Advocate", message: "Pushing through drains your physiological reserves, doubling recovery duration and risking contagion. Stay isolated." },
+      { speaker: "The Cold Pragmatist", message: "Verify remote access policies or medical deferrals. If remote work is possible, rest is the optimal strategy." }
     ];
-    consensusSummary = "Rest immediately to shorten total illness duration, but negotiate remote attendance channels or lecture slide shares within 12 hours.";
+    consensusSummary = "Prioritize immediate recovery to minimize long-term performance deficits, while securing remote accommodation options.";
 
   } else if (hasLeisure && hasProductivity) {
-    biasScore = 70;
     detectedBiases = [
       {
         name: "Present Bias / Hyperbolic Discounting",
         severity: "high",
-        explanation: "Valuing the immediate, high-dopamine relaxation value of entertainment now while heavily discounting the upcoming stress and temporal debt of deadlines."
+        explanation: "Valuing the immediate relaxation value of entertainment now while heavily discounting the upcoming stress and temporal debt of deadlines."
       }
     ];
-    reframedDecision = "How should I divide my available hours between study tasks and leisure to maintain stress-free productivity?";
+    reframedDecision = `How should I divide my available hours between study tasks and leisure to maintain stress-free productivity?`;
     debateTranscript = [
-      { speaker: "The Visionary Optimist", message: "A short gaming/movie session will recharge your brain! Let's enjoy ourselves first to build creative inspiration." },
-      { speaker: "The Devil's Advocate", message: "Leisure blockades will trigger a massive panic spike tonight. Work backlog grows hourly. Stop procrastinating." },
-      { speaker: "The Cold Pragmatist", message: "Apply a timed interval system. 90 minutes of focused task execution followed by a 20-minute leisure reward. This mitigates exhaustion without debt." }
+      { speaker: "The Visionary Optimist", message: "Leisure will refresh your cognitive margins. A short game or movie session builds enthusiasm." },
+      { speaker: "The Devil's Advocate", message: "Delaying work increases cognitive overhead and deadline anxiety. Procrastination is a net liability." },
+      { speaker: "The Cold Pragmatist", message: "Implement a structured interval system: 90 minutes of focused task execution followed by a 20-minute leisure reward." }
     ];
     consensusSummary = "Execute a Pomodoro or structured split-time system to secure progress before unlocking guilt-free leisure rewards.";
 
   } else if (hasFood) {
-    let itemNoun = 'food';
-    if (cleanNorm.includes('apple')) itemNoun = 'apple';
-    else if (cleanNorm.includes('mushroom')) itemNoun = 'mushroom';
-    else if (cleanNorm.includes('milk')) itemNoun = 'milk';
-    else if (cleanNorm.includes('meat')) itemNoun = 'meat';
-
-    biasScore = 40;
     detectedBiases = [
       {
         name: "Optimism Bias & Sunk Cost",
         severity: "medium",
-        explanation: `Believing you are biologically immune to potential bacterial active pathogens because you do not want to throw away a purchased ${itemNoun}.`
+        explanation: "Believing you are biologically immune to potential bacterial pathogens because you do not want to throw away purchased food."
       }
     ];
-    reframedDecision = `Should I consume this questionable ${itemNoun} with potential mold markers, or utilize a safe nutritional alternative?`;
+    reframedDecision = `Should I consume this questionable item with potential mold markers, or utilize a safe nutritional alternative?`;
     debateTranscript = [
-      { speaker: "The Visionary Optimist", message: "The spots look tiny! It probably tastes fine and wasting food is a shame. Trim the edge and eat it." },
+      { speaker: "The Visionary Optimist", message: "The blemishes look superficial. Trimming the minor spots protects the food from waste." },
       { speaker: "The Devil's Advocate", message: "A minor food poisoning incident will cost you 2 days of productive life. Discarding a low-cost item is far cheaper than medical costs." },
-      { speaker: "The Cold Pragmatist", message: `Assess the structural firmness of the ${itemNoun}. If it is soft or smells off, the fungal network is already deep. Discard it.` }
+      { speaker: "The Cold Pragmatist", message: "Assess the structural firmness of the item. If it is soft or smells off, the fungal network is already deep. Discard it." }
     ];
     consensusSummary = "Do not consume if structural integrity has degraded; prioritize physical safety when spotless alternatives exist.";
 
   } else {
-    // General action fallbacks
     let actionStr = cleanNorm.replace(/should i|should we|i want to|i need to|is it good to|what if i/gi, '').trim() || 'this action';
-    biasScore = 35;
     detectedBiases = [
       {
         name: "Status Quo Bias / Framing Effect",
@@ -516,14 +341,13 @@ function generateOfflineSimulation(decision, riskTolerance, personality) {
     ];
     reframedDecision = `What are the clear resource expenditures, risks, and compounding advantages of choosing to: "${actionStr}"?`;
     debateTranscript = [
-      { speaker: "The Visionary Optimist", message: `We must leap forward! Starting "${actionStr}" opens brand new opportunities and forces positive change.` },
-      { speaker: "The Devil's Advocate", message: `Starting "${actionStr}" introduces severe volatility and eats up valuable spare time. What if we fail or get burnt out?` },
-      { speaker: "The Cold Pragmatist", message: `Test it incrementally. Do not resign or invest large capital immediately. Allocate 5 hours a week for a month to gather concrete evidence.` }
+      { speaker: "The Visionary Optimist", message: `Executing "${actionStr}" opens new growth trajectories and breaks static patterns.` },
+      { speaker: "The Devil's Advocate", message: `This commitment introduces resource volatility and reduces time margins. The downside risk remains high.` },
+      { speaker: "The Cold Pragmatist", message: "Initiate a low-risk, low-cost pilot phase to gather outcome data before making a long-term commitment." }
     ];
     consensusSummary = "Pursue the action through small, low-risk experiments to validate outcomes before committing significant resources.";
   }
 
-  // 3. Assemble response to match the exact JSON schema requested
   return {
     decision_summary: decision,
     scenarios: scenarios,
