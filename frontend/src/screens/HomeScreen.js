@@ -10,14 +10,82 @@ import {
   Platform, 
   SafeAreaView,
   Alert,
-  Animated
+  Animated,
+  TouchableOpacity
 } from 'react-native';
-import Button from '../components/Button';
 import Dropdown from '../components/Dropdown';
 import Card from '../components/Card';
 import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY } from '../styles/theme';
 import { simulateDecision } from '../services/api';
 import { saveSimulation } from '../services/storage';
+
+// Dot-Dash Glowing Separator Line
+const DotDashSeparator = () => (
+  <View style={styles.dotDashContainer}>
+    <View style={styles.dashLine} />
+    <View style={styles.dot} />
+    <View style={styles.dashLine} />
+  </View>
+);
+
+// Vector SVG Icon for Simulation History (Amber Folder/Clock)
+const HistoryIcon = () => (
+  <View style={styles.iconContainer}>
+    {Platform.OS === 'web' ? (
+      <div dangerouslySetInnerHTML={{__html: `
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <polyline points="12 6 12 12 16 14"/>
+        </svg>
+      `}} style={{display: 'flex', alignItems: 'center'}} />
+    ) : (
+      <View style={[styles.fallbackIcon, { borderColor: '#fbbf24' }]} />
+    )}
+  </View>
+);
+
+// Vector SVG Icon for Compare Scenarios (Magenta Analytics Chart)
+const CompareIcon = () => (
+  <View style={styles.iconContainer}>
+    {Platform.OS === 'web' ? (
+      <div dangerouslySetInnerHTML={{__html: `
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ec4899" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="20" x2="18" y2="10"/>
+          <line x1="12" y1="20" x2="12" y2="4"/>
+          <line x1="6" y1="20" x2="6" y2="14"/>
+        </svg>
+      `}} style={{display: 'flex', alignItems: 'center'}} />
+    ) : (
+      <View style={[styles.fallbackIcon, { borderColor: '#ec4899' }]} />
+    )}
+  </View>
+);
+
+// Web-only Styles (bypass Hermes static parser validation inside StyleSheet.create)
+const WEB_STYLES = {
+  formCard: {
+    backdropFilter: 'blur(20px)',
+    transition: 'all 0.4s ease-in-out',
+  },
+  formCardActive: {
+    boxShadow: '0 0 30px rgba(0, 229, 255, 0.12)',
+  },
+  textInput: {
+    transition: 'all 0.3s ease-in-out',
+  },
+  textInputFocused: {
+    boxShadow: 'inset 0 0 20px rgba(0, 229, 255, 0.08), 0 0 10px rgba(0, 229, 255, 0.05)',
+  },
+  simulateBtnContainer: {
+    transition: 'all 0.3s ease-in-out',
+  },
+  historyBtn: {
+    transition: 'all 0.3s ease',
+  },
+  compareBtn: {
+    transition: 'all 0.3s ease',
+  }
+};
 
 export default function HomeScreen({ navigation, route }) {
   const [decision, setDecision] = useState('');
@@ -29,6 +97,7 @@ export default function HomeScreen({ navigation, route }) {
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(40)).current;
+  const scanAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     // Listen for reframed decisions from ResultScreen
@@ -56,6 +125,22 @@ export default function HomeScreen({ navigation, route }) {
     ]).start();
   }, []);
 
+  // Loop scanline sweeping bar while input is focused
+  useEffect(() => {
+    if (isFocused) {
+      scanAnim.setValue(0);
+      Animated.loop(
+        Animated.timing(scanAnim, {
+          toValue: 1,
+          duration: 3500,
+          useNativeDriver: false,
+        })
+      ).start();
+    } else {
+      scanAnim.setValue(0);
+    }
+  }, [isFocused]);
+
   const riskOptions = [
     { label: 'Low Risk Tolerance', value: 'low' },
     { label: 'Medium Risk Tolerance', value: 'medium' },
@@ -77,20 +162,15 @@ export default function HomeScreen({ navigation, route }) {
 
     setLoading(true);
     try {
-      // Call standard simulation API (with fallback)
       const result = await simulateDecision(decision.trim(), risk, personality);
-      
-      // Save result to AsyncStorage history automatically
       const savedRecord = await saveSimulation(decision.trim(), result);
       
-      // Navigate to results screen with results and record ID
       navigation.navigate('Result', { 
         simulation: savedRecord.result, 
         decision: savedRecord.decision,
         recordId: savedRecord.id
       });
       
-      // Reset input on success
       setDecision('');
     } catch (error) {
       Alert.alert('Simulation Error', 'Failed to generate simulation results. Please try again.');
@@ -112,22 +192,58 @@ export default function HomeScreen({ navigation, route }) {
           <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
             {/* Header */}
             <View style={styles.header}>
-              <Text style={styles.title}>Decision Simulator AI</Text>
+              <Text style={[styles.title, Platform.OS === 'web' && { animation: 'bioluminescentPulse 4s infinite ease-in-out' }]}>
+                Decision Simulator AI
+              </Text>
               <Text style={styles.subtitle}>
                 Analyze potential pathways. Contrast probabilities. Map emotional impacts.
               </Text>
-              <View style={styles.decoratorLine} />
+              <View style={styles.headerDotDash}>
+                <DotDashSeparator />
+              </View>
             </View>
 
-            {/* Form Card */}
-            <Card style={styles.formCard}>
+            {/* Input Card Container (Glassmorphic Outer Frame) */}
+            <Card 
+              style={[
+                styles.formCard, 
+                isFocused && styles.formCardActive,
+                Platform.OS === 'web' && WEB_STYLES.formCard,
+                Platform.OS === 'web' && isFocused && WEB_STYLES.formCardActive
+              ]} 
+              outlined 
+              shadowed={false}
+            >
+              
+              {/* Animated Laser Scanning Sweep Line */}
+              {isFocused && (
+                <Animated.View 
+                  style={[
+                    styles.scanline,
+                    {
+                      top: scanAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ['0%', '100%'],
+                      })
+                    }
+                  ]}
+                />
+              )}
+
               <Text style={styles.inputLabel}>Describe Your Decision</Text>
+              <DotDashSeparator />
+              
               <TextInput
-                style={[styles.textInput, isFocused && styles.textInputFocused]}
+                style={[
+                  styles.textInput, 
+                  isFocused && styles.textInputFocused,
+                  Platform.OS === 'web' && WEB_STYLES.textInput,
+                  Platform.OS === 'web' && isFocused && WEB_STYLES.textInputFocused
+                ]}
                 multiline
                 numberOfLines={4}
                 placeholder="e.g., Should I accept the senior software engineer offer at the startup, or stay in my stable corporate role?"
-                placeholderTextColor={COLORS.textMuted}
+                placeholderTextColor="#587396"
                 value={decision}
                 onChangeText={setDecision}
                 textAlignVertical="top"
@@ -153,31 +269,54 @@ export default function HomeScreen({ navigation, route }) {
                 options={personalityOptions}
               />
 
-              {/* Simulate Button */}
-              <Button
-                title="Simulate Futures"
+              {/* Loop Animated Gradient Simulated Button */}
+              <TouchableOpacity
+                activeOpacity={0.85}
                 onPress={handleSimulate}
-                loading={loading}
-                style={styles.simulateBtn}
-              />
+                disabled={loading}
+                style={[
+                  styles.simulateBtnContainer,
+                  Platform.OS === 'web' && WEB_STYLES.simulateBtnContainer,
+                  Platform.OS === 'web' && {
+                    background: 'linear-gradient(-45deg, #00e5ff, #a855f7, #00e5ff, #a855f7)',
+                    backgroundSize: '400% 400%',
+                    animation: 'btnGradientSweep 6s infinite ease',
+                  }
+                ]}
+              >
+                <Text style={styles.simulateBtnText}>
+                  {loading ? 'ANALYZING THREADS...' : 'SIMULATE FUTURES'}
+                </Text>
+              </TouchableOpacity>
             </Card>
 
-            {/* Navigation Shortcuts */}
+            {/* Bottom Glassmorphism Buttons (Left: Amber, Right: Magenta) */}
             <View style={styles.shortcutRow}>
-              <Button
-                title="📜 Simulation History"
+              {/* History Button (Amber Tinted) */}
+              <TouchableOpacity
+                activeOpacity={0.8}
                 onPress={() => navigation.navigate('History')}
-                variant="light"
-                style={styles.shortcutBtn}
-                textStyle={styles.shortcutText}
-              />
-              <Button
-                title="📊 Compare Scenarios"
+                style={[
+                  styles.historyBtn,
+                  Platform.OS === 'web' && WEB_STYLES.historyBtn
+                ]}
+              >
+                <HistoryIcon />
+                <Text style={styles.historyBtnText}>Simulation History</Text>
+              </TouchableOpacity>
+
+              {/* Compare Button (Magenta Tinted) */}
+              <TouchableOpacity
+                activeOpacity={0.8}
                 onPress={() => navigation.navigate('Compare')}
-                variant="light"
-                style={styles.shortcutBtn}
-                textStyle={styles.shortcutText}
-              />
+                style={[
+                  styles.compareBtn,
+                  Platform.OS === 'web' && WEB_STYLES.compareBtn
+                ]}
+              >
+                <CompareIcon />
+                <Text style={styles.compareBtnText}>Compare Scenarios</Text>
+              </TouchableOpacity>
             </View>
           </Animated.View>
         </ScrollView>
@@ -205,83 +344,172 @@ const styles = StyleSheet.create({
   },
   title: {
     ...TYPOGRAPHY.h1,
-    color: COLORS.textPrimary,
+    color: '#00e5ff',
     fontWeight: '900',
-    letterSpacing: -0.5,
-    ...Platform.select({
-      web: {
-        background: 'linear-gradient(90deg, #3B82F6 0%, #A855F7 100%)',
-        WebkitBackgroundClip: 'text',
-        WebkitTextFillColor: 'transparent',
-      }
-    })
+    letterSpacing: 2,
+    textTransform: 'uppercase',
   },
   subtitle: {
     ...TYPOGRAPHY.body,
-    color: COLORS.textSecondary,
-    marginTop: 6,
+    color: '#94A3B8',
+    marginTop: 8,
     lineHeight: 22,
-    fontWeight: '500',
   },
-  decoratorLine: {
-    width: 60,
-    height: 4,
-    backgroundColor: COLORS.accentBlue,
-    borderRadius: BORDER_RADIUS.full,
-    marginTop: SPACING.md,
-    shadowColor: COLORS.accentBlue,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 8,
+  headerDotDash: {
+    marginTop: SPACING.sm,
   },
   formCard: {
     padding: SPACING.lg,
-    borderWidth: 1.5,
-    borderColor: COLORS.border,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 229, 255, 0.15)',
     borderRadius: BORDER_RADIUS.lg,
+    backgroundColor: 'rgba(0, 229, 255, 0.03)', // Frosted glass transparent cyan
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  formCardActive: {
+    borderColor: 'rgba(0, 229, 255, 0.45)',
+  },
+  scanline: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: '#00e5ff',
+    shadowColor: '#00e5ff',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 8,
+    zIndex: 10,
+    pointerEvents: 'none',
   },
   inputLabel: {
-    ...TYPOGRAPHY.subtext,
-    fontWeight: '700',
-    color: COLORS.textSecondary,
-    marginBottom: SPACING.sm,
+    fontFamily: 'Orbitron',
+    fontSize: 10,
+    fontWeight: '800',
+    color: 'rgba(0, 229, 255, 0.7)',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 1.5,
   },
   textInput: {
-    minHeight: 110,
-    borderWidth: 1.5,
-    borderColor: COLORS.border,
+    fontFamily: 'IBM Plex Mono',
+    minHeight: 115,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 229, 255, 0.12)',
     borderRadius: BORDER_RADIUS.md,
     padding: SPACING.md,
-    fontSize: 15,
-    color: COLORS.textPrimary,
-    backgroundColor: COLORS.surface, // Obsidian dark inset layer
+    fontSize: 14,
+    color: '#F8FAFC',
+    backgroundColor: 'rgba(3, 5, 13, 0.6)', // Deep inset box
     marginBottom: SPACING.md,
     lineHeight: 22,
   },
   textInputFocused: {
-    borderColor: COLORS.accentBlue,
-    shadowColor: COLORS.accentBlue,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
+    borderColor: '#00e5ff',
   },
-  simulateBtn: {
-    marginTop: SPACING.sm,
+  simulateBtnContainer: {
     height: 52,
+    backgroundColor: '#00e5ff', // Fallback color
+    borderRadius: BORDER_RADIUS.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: SPACING.sm,
+    shadowColor: '#00e5ff',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.45,
+    shadowRadius: 15,
+    elevation: 6,
+  },
+  simulateBtnText: {
+    fontFamily: 'Orbitron',
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#03050d', // High-contrast cosmic black text
+    letterSpacing: 1.5,
   },
   shortcutRow: {
     flexDirection: 'row',
-    gap: SPACING.sm,
-    marginTop: SPACING.md,
+    gap: SPACING.md,
+    marginTop: SPACING.lg,
   },
-  shortcutBtn: {
+  historyBtn: {
     flex: 1,
     height: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.sm,
+    backgroundColor: 'rgba(251, 191, 36, 0.03)', // Amber translucent
+    borderWidth: 1.5,
+    borderColor: 'rgba(251, 191, 36, 0.15)',
+    borderRadius: BORDER_RADIUS.md,
+    shadowColor: '#fbbf24',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
   },
-  shortcutText: {
-    fontSize: 13,
+  historyBtnText: {
+    fontFamily: 'Orbitron',
+    fontSize: 11,
     fontWeight: '700',
+    color: '#fbbf24',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  compareBtn: {
+    flex: 1,
+    height: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.sm,
+    backgroundColor: 'rgba(236, 72, 153, 0.03)', // Magenta translucent
+    borderWidth: 1.5,
+    borderColor: 'rgba(236, 72, 153, 0.15)',
+    borderRadius: BORDER_RADIUS.md,
+    shadowColor: '#ec4899',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+  },
+  compareBtnText: {
+    fontFamily: 'Orbitron',
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#ec4899',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  dotDashContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    marginTop: 4,
+    marginBottom: SPACING.sm,
+  },
+  dashLine: {
+    height: 1.5,
+    backgroundColor: 'rgba(0, 229, 255, 0.15)',
+    width: 25,
+  },
+  dot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#00e5ff',
+    marginHorizontal: 4,
+    shadowColor: '#00e5ff',
+    shadowOpacity: 0.8,
+    shadowRadius: 4,
+  },
+  iconContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fallbackIcon: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    borderWidth: 2,
   },
 });

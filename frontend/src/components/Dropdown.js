@@ -7,7 +7,8 @@ import {
   View, 
   Modal, 
   FlatList, 
-  SafeAreaView 
+  SafeAreaView,
+  Platform
 } from 'react-native';
 import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY } from '../styles/theme';
 
@@ -34,17 +35,16 @@ export default function Dropdown({
       <TouchableOpacity
         activeOpacity={0.8}
         onPress={() => setModalVisible(true)}
-        style={styles.trigger}
+        style={[styles.trigger, Platform.OS === 'web' && WEB_STYLES.trigger]}
       >
         <Text style={[styles.triggerText, !selectedOption && styles.placeholder]}>
           {selectedOption ? selectedOption.label : placeholder}
         </Text>
-        {/* Sleek down chevron drawn with pure css / text */}
-        <Text style={styles.arrow}>▼</Text>
+        <Text style={styles.arrow}>{modalVisible ? '▼' : '▶'}</Text>
       </TouchableOpacity>
 
       <Modal
-        animationType="slide"
+        animationType="fade"
         transparent={true}
         visible={modalVisible}
         onRequestClose={() => setModalVisible(false)}
@@ -104,44 +104,57 @@ export default function Dropdown({
   );
 }
 
+// Web-only Styles (bypass Hermes static parser validation inside StyleSheet.create)
+const WEB_STYLES = {
+  trigger: {
+    transition: 'all 0.3s ease',
+    boxShadow: 'inset 0 0 15px rgba(0, 229, 255, 0.03)',
+  }
+};
+
 const styles = StyleSheet.create({
   container: {
     marginBottom: SPACING.md,
   },
   label: {
-    ...TYPOGRAPHY.subtext,
+    fontFamily: 'Orbitron',
+    fontSize: 10,
     fontWeight: '700',
-    color: COLORS.textSecondary,
+    color: 'rgba(0, 229, 255, 0.7)',
     marginBottom: SPACING.xs,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 1.5,
   },
   trigger: {
     height: 52,
-    borderWidth: 1.5,
-    borderColor: COLORS.border,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 229, 255, 0.15)',
+    borderLeftWidth: 4,
+    borderLeftColor: '#00e5ff',
     borderRadius: BORDER_RADIUS.md,
-    backgroundColor: COLORS.surface,
+    backgroundColor: 'rgba(0, 229, 255, 0.04)',
     paddingHorizontal: SPACING.md,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
   triggerText: {
-    ...TYPOGRAPHY.body,
+    fontFamily: 'IBM Plex Mono',
+    fontSize: 14,
     fontWeight: '600',
-    color: COLORS.textPrimary,
+    color: '#00e5ff',
   },
   placeholder: {
-    color: COLORS.textMuted,
+    color: '#587396',
   },
   arrow: {
-    fontSize: 11,
-    color: COLORS.accentBlue,
+    fontSize: 10,
+    color: '#00e5ff',
+    fontWeight: 'bold',
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: COLORS.overlay,
+    backgroundColor: 'rgba(3, 5, 13, 0.85)',
     justifyContent: 'flex-end',
   },
   modalDismiss: {
