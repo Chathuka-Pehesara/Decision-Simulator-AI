@@ -326,7 +326,7 @@ export default function ResultScreen({ route, navigation }) {
 
   const handleShare = async () => {
     try {
-      let shareText = `🔮 Decision Simulator AI Report\n`;
+      let shareText = `📊 Decision Simulation Report\n`;
       shareText += `Decision: "${decision}"\n\n`;
       shareText += `🧠 Cognitive Bias Score: ${biasScore}/100\n`;
       shareText += `💡 Objective Reframe: "${cognitive_analysis.reframed_decision || 'N/A'}"\n\n`;
@@ -363,7 +363,7 @@ export default function ResultScreen({ route, navigation }) {
       >
         {/* Dynamic header banner */}
         <Animated.View style={[styles.banner, { opacity: headerFade }, Platform.OS === 'web' && WEB_STYLES.banner]}>
-          <Text style={styles.bannerLabel}>SIMULATION REPORT ENGINE</Text>
+          <Text style={styles.bannerLabel}>DECISION SIMULATION REPORT</Text>
           <Text style={styles.bannerTitle}>"{decision}"</Text>
         </Animated.View>
 
@@ -407,7 +407,7 @@ export default function ResultScreen({ route, navigation }) {
                 ) : (
                   <View style={styles.objectivePulseBox}>
                     <Text style={styles.objectivePulseText}>
-                      🎉 OPTIMAL COGNITIVE FREQUENCY SECURED. DECISION COMPLIES WITH ALL STRICT RATIONAL CRITERIA.
+                      No cognitive distortions detected. The formulation complies with objective analytical criteria.
                     </Text>
                   </View>
                 )}
@@ -419,7 +419,7 @@ export default function ResultScreen({ route, navigation }) {
               <View style={styles.reframeCard}>
                 <View style={styles.reframeHeader}>
                   <Text style={styles.reframeIcon}>💡</Text>
-                  <Text style={styles.reframeTitle}>OBJECTIVE COGNITIVE REFRAME</Text>
+                  <Text style={styles.reframeTitle}>OBJECTIVE REFRAME</Text>
                 </View>
                 <Text style={styles.reframeText}>"{cognitive_analysis.reframed_decision}"</Text>
                 
@@ -430,7 +430,7 @@ export default function ResultScreen({ route, navigation }) {
                     navigation.navigate('Home', { reframedDecision: cognitive_analysis.reframed_decision });
                   }}
                 >
-                  <Text style={styles.reframeBtnText}>RE-INITIALIZE WITH SYSTEM REFRAME</Text>
+                  <Text style={styles.reframeBtnText}>RE-INITIALIZE WITH REFRAMED DECISION</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -504,7 +504,7 @@ export default function ResultScreen({ route, navigation }) {
                       
                       {/* Technical reasoning block */}
                       <View style={styles.reasoningCard}>
-                        <Text style={styles.reasoningLabel}>AI LOGICAL DEBATE ANALYSIS</Text>
+                        <Text style={styles.reasoningLabel}>COGNITIVE AND PERSPECTIVE ANALYSIS</Text>
                         <Text style={styles.reasoningText}>{scenario.reasoning}</Text>
                       </View>
                     </View>
@@ -554,7 +554,7 @@ export default function ResultScreen({ route, navigation }) {
                 >
                   <View style={styles.disclaimerHeader}>
                     <Text style={styles.disclaimerWarningIcon}>⚠️</Text>
-                    <Text style={styles.disclaimerLabel}>CLASSIFIED NEURAL DISCLAIMER</Text>
+                    <Text style={styles.disclaimerLabel}>ANALYTICAL SIMULATION DISCLAIMER</Text>
                   </View>
                   <Text style={styles.disclaimerText}>
                     {final_note || 'This outcome simulation utilizes high-frequency behavioral filters. It acts as an analytical decision modeling instrument and is strictly not to be interpreted as direct legal, financial, or personal advice. Exercise primary caution.'}
@@ -573,7 +573,7 @@ export default function ResultScreen({ route, navigation }) {
             onPress={handleShare}
             style={styles.shareBtn}
           >
-            <Text style={styles.shareBtnText}>📤 TRANSMIT SIMULATION DATALOG</Text>
+            <Text style={styles.shareBtnText}>📤 EXPORT SIMULATION REPORT</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -581,7 +581,7 @@ export default function ResultScreen({ route, navigation }) {
             onPress={() => navigation.navigate('Home')}
             style={styles.doneBtn}
           >
-            <Text style={styles.doneBtnText}>CLOSE HUD</Text>
+            <Text style={styles.doneBtnText}>CLOSE PANEL</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>

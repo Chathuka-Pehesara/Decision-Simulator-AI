@@ -34,9 +34,13 @@ export async function saveSimulation(decision, result) {
       personality: result.personality || 'balanced',
       timestamp: new Date().toISOString(),
       result: {
+        ...result,
         decision_summary: result.decision_summary || decision,
         scenarios: result.scenarios || [],
         key_factors_to_consider: result.key_factors_to_consider || [],
+        cognitive_analysis: result.cognitive_analysis || { bias_score: 0, detected_biases: [], reframed_decision: "" },
+        boardroom_debate: result.boardroom_debate || { advisors: [], debate_transcript: [], consensus_summary: "" },
+        confidence_assessment: result.confidence_assessment || { level: "Low Confidence", score: 0, limitations: [] },
         final_note: result.final_note || '',
       }
     };
