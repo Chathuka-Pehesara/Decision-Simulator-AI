@@ -17,6 +17,106 @@ import Button from '../components/Button';
 import Card from '../components/Card';
 import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY } from '../styles/theme';
 
+// Custom Monte Carlo Probability Histogram
+const MonteCarloChart = ({ distribution, accentColor = '#00e5ff' }) => {
+  if (!distribution || !Array.isArray(distribution) || distribution.length === 0) {
+    return null;
+  }
+
+  const maxVal = Math.max(...distribution, 1);
+  
+  return (
+    <View style={styles.monteCarloContainer}>
+      <Text style={styles.monteCarloTitle}>MONTE CARLO PROBABILITY DISTRIBUTION (10,000 TRIALS)</Text>
+      
+      <View style={styles.histogramWrapper}>
+        {distribution.map((val, idx) => {
+          const barHeight = (val / maxVal) * 80;
+          return (
+            <View key={idx.toString()} style={styles.histogramColumn}>
+              <View style={styles.barContainer}>
+                <View 
+                  style={[
+                    styles.histogramBar, 
+                    { 
+                      height: Math.max(barHeight, 2), 
+                      backgroundColor: accentColor,
+                      shadowColor: accentColor,
+                    }
+                  ]} 
+                />
+              </View>
+              <Text style={styles.histogramLabel}>{idx * 10}%</Text>
+            </View>
+          );
+        })}
+      </View>
+      <View style={styles.monteCarloMetaRow}>
+        <Text style={styles.monteCarloMetaText}>Variance-adjusted trials model outcome density centering around the expected value.</Text>
+      </View>
+    </View>
+  );
+};
+
+// Custom Causal Chain Timeline/Tree
+const CausalChainTree = ({ chain, accentColor = '#00e5ff' }) => {
+  if (!chain || !chain.title) return null;
+
+  const nodes = [];
+  let current = chain;
+  let order = 1;
+  while (current) {
+    nodes.push({
+      title: current.title,
+      probability: current.probability,
+      order: order
+    });
+    current = current.next;
+    order++;
+  }
+
+  const getOrderSuffix = (ord) => {
+    if (ord === 1) return '1ST ORDER ACTION';
+    if (ord === 2) return '2ND ORDER CONSEQUENCE';
+    if (ord === 3) return '3RD ORDER IMPACT';
+    return `${ord}TH ORDER IMPACT`;
+  };
+
+  return (
+    <View style={styles.causalContainer}>
+      <Text style={styles.causalTitle}>CAUSAL CONSEQUENCE CHAIN</Text>
+      
+      <View style={styles.causalTree}>
+        {nodes.map((node, idx) => {
+          const isLast = idx === nodes.length - 1;
+          return (
+            <View key={idx.toString()} style={styles.causalNodeRow}>
+              <View style={styles.indicatorCol}>
+                <View style={[styles.nodeDot, { borderColor: accentColor }]}>
+                  <Text style={[styles.nodeDotText, { color: accentColor }]}>{node.order}</Text>
+                </View>
+                {!isLast && (
+                  <View style={[styles.connectingLine, { backgroundColor: 'rgba(255,255,255,0.1)' }]} />
+                )}
+              </View>
+
+              <View style={styles.nodeCardCol}>
+                <View style={styles.nodeCard}>
+                  <View style={styles.nodeCardHeader}>
+                    <Text style={styles.nodeOrderLabel}>{getOrderSuffix(node.order)}</Text>
+                    <Text style={[styles.nodeProb, { color: accentColor }]}>{node.probability}% Prob</Text>
+                  </View>
+                  <Text style={styles.nodeTitle}>{node.title}</Text>
+                </View>
+              </View>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+};
+
 // Animated Glowing Section Header Chip
 const SectionHeaderChip = ({ title, svgIconHtml }) => (
   <View style={styles.chipContainer}>
@@ -538,6 +638,18 @@ export default function ResultScreen({ route, navigation }) {
                         <Text style={styles.reasoningLabel}>COGNITIVE AND PERSPECTIVE ANALYSIS</Text>
                         <Text style={styles.reasoningText}>{scenario.reasoning}</Text>
                       </View>
+
+                      {/* Monte Carlo Distribution */}
+                      <MonteCarloChart 
+                        distribution={scenario.monte_carlo_distribution} 
+                        accentColor={accentColor} 
+                      />
+
+                      {/* Causal Chain Engine */}
+                      <CausalChainTree 
+                        chain={scenario.causal_chain} 
+                        accentColor={accentColor} 
+                      />
                     </View>
                   </Card>
                 </Animated.View>
@@ -1254,5 +1366,149 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: '#00e5ff',
     borderRadius: BORDER_RADIUS.full,
+  },
+  monteCarloContainer: {
+    backgroundColor: 'rgba(3, 5, 13, 0.5)',
+    borderColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderRadius: BORDER_RADIUS.md,
+    padding: SPACING.md,
+    marginTop: SPACING.md,
+  },
+  monteCarloTitle: {
+    fontFamily: 'Orbitron',
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#a855f7',
+    letterSpacing: 1,
+    marginBottom: SPACING.md,
+  },
+  histogramWrapper: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    height: 95,
+    paddingBottom: 5,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: SPACING.xs,
+  },
+  histogramColumn: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  barContainer: {
+    height: 80,
+    justifyContent: 'flex-end',
+    width: '75%',
+  },
+  histogramBar: {
+    width: '100%',
+    borderTopLeftRadius: 2,
+    borderTopRightRadius: 2,
+    opacity: 0.85,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 4,
+  },
+  histogramLabel: {
+    fontFamily: 'Orbitron',
+    fontSize: 7,
+    color: '#587396',
+    marginTop: 6,
+  },
+  monteCarloMetaRow: {
+    marginTop: SPACING.sm,
+  },
+  monteCarloMetaText: {
+    fontFamily: 'IBM Plex Mono',
+    fontSize: 10,
+    color: '#587396',
+    lineHeight: 14,
+  },
+  causalContainer: {
+    backgroundColor: 'rgba(8, 12, 28, 0.4)',
+    borderColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderRadius: BORDER_RADIUS.md,
+    padding: SPACING.md,
+    marginTop: SPACING.md,
+  },
+  causalTitle: {
+    fontFamily: 'Orbitron',
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#a855f7',
+    letterSpacing: 1,
+    marginBottom: SPACING.md,
+  },
+  causalTree: {
+    paddingLeft: 4,
+  },
+  causalNodeRow: {
+    flexDirection: 'row',
+    position: 'relative',
+  },
+  indicatorCol: {
+    width: 30,
+    alignItems: 'center',
+  },
+  nodeDot: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    backgroundColor: '#03050d',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
+  },
+  nodeDotText: {
+    fontFamily: 'Orbitron',
+    fontSize: 9,
+    fontWeight: '800',
+  },
+  connectingLine: {
+    width: 1.5,
+    position: 'absolute',
+    top: 20,
+    bottom: 0,
+    zIndex: 1,
+  },
+  nodeCardCol: {
+    flex: 1,
+    paddingBottom: SPACING.md,
+    paddingLeft: SPACING.xs,
+  },
+  nodeCard: {
+    backgroundColor: 'rgba(3, 5, 13, 0.6)',
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+    borderWidth: 1,
+    borderRadius: BORDER_RADIUS.sm,
+    padding: SPACING.sm,
+  },
+  nodeCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  nodeOrderLabel: {
+    fontFamily: 'Orbitron',
+    fontSize: 8,
+    color: '#587396',
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  nodeProb: {
+    fontFamily: 'Orbitron',
+    fontSize: 8,
+    fontWeight: '800',
+  },
+  nodeTitle: {
+    fontFamily: 'IBM Plex Mono',
+    fontSize: 12,
+    color: '#F8FAFC',
+    lineHeight: 16,
   },
 });

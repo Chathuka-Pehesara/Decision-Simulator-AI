@@ -17,7 +17,7 @@ const getBackendUrl = () => {
     }
   }
   // Fallback to the discovered local Wi-Fi IP address of the development machine
-  return 'http://10.188.179.4:3000/simulate';
+  return 'http://10.223.99.4:3000/simulate';
 };
 
 const API_URL = getBackendUrl();

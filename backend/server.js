@@ -146,6 +146,47 @@ function normalizeInput(decision) {
   return reconstructed;
 }
 
+
+/**
+ * Run a 10,000-run stochastic simulation using Box-Muller transform
+ * Returns an array of 10 bin counts representing decile frequencies
+ */
+function runMonteCarlo(baseProbability, riskTolerance) {
+  const mean = parseFloat(baseProbability) || 50;
+  
+  let stdDev = 12;
+  if (riskTolerance) {
+    const r = riskTolerance.toLowerCase();
+    if (r === 'low') stdDev = 8;
+    else if (r === 'high') stdDev = 18;
+  }
+  
+  const bins = new Array(10).fill(0);
+  const numTrials = 10000;
+  
+  for (let i = 0; i < numTrials; i++) {
+    let u1 = 0, u2 = 0;
+    while (u1 === 0) u1 = Math.random();
+    while (u2 === 0) u2 = Math.random();
+    
+    const z0 = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
+    let sample = mean + z0 * stdDev;
+    
+    // Clip sample between 0 and 100
+    if (sample < 0) sample = 0;
+    if (sample > 100) sample = 100;
+    
+    // Determine decile bin index (0 to 9)
+    let binIdx = Math.floor(sample / 10);
+    if (binIdx > 9) binIdx = 9;
+    if (binIdx < 0) binIdx = 0;
+    
+    bins[binIdx]++;
+  }
+  
+  return bins;
+}
+
 /**
  * POST /simulate
  * Receives: { decision, risk, personality }
@@ -167,18 +208,37 @@ app.post('/simulate', async (req, res) => {
     console.log(`[AI MODE] Generating real Generative AI simulations for: "${normalized}"`);
     try {
       const result = await generateGeminiSimulation(normalized, risk, personality, apiKey);
+      if (result.scenarios && Array.isArray(result.scenarios)) {
+        result.scenarios = result.scenarios.map(s => {
+          s.monte_carlo_distribution = runMonteCarlo(s.probability || 50, risk);
+          return s;
+        });
+      }
       return res.json(result);
     } catch (err) {
       console.error('[AI MODE ERROR] Failed calling Gemini, falling back to Server Simulator...', err.message);
       const fallbackResult = generateServerSimulation(normalized, risk, personality);
+      if (fallbackResult.scenarios && Array.isArray(fallbackResult.scenarios)) {
+        fallbackResult.scenarios = fallbackResult.scenarios.map(s => {
+          s.monte_carlo_distribution = runMonteCarlo(s.probability || 50, risk);
+          return s;
+        });
+      }
       return res.json(fallbackResult);
     }
   } else {
     console.log(`[SIMULATOR MODE] Serving local context scenarios for: "${normalized}"`);
     const fallbackResult = generateServerSimulation(normalized, risk, personality);
+    if (fallbackResult.scenarios && Array.isArray(fallbackResult.scenarios)) {
+      fallbackResult.scenarios = fallbackResult.scenarios.map(s => {
+        s.monte_carlo_distribution = runMonteCarlo(s.probability || 50, risk);
+        return s;
+      });
+    }
     return res.json(fallbackResult);
   }
 });
+
 
 /**
  * Call Gemini 2.5 Flash API and instruct it to return a clean JSON payload matching our schema
@@ -220,6 +280,19 @@ INSTRUCTIONS:
    - Keep 'emotional_impact' to a concise 1-2 word professional state.
    - Every scenario's 'reasoning' block MUST be formatted exactly as:
      "Probability Heuristic: [Explain how the X% probability is derived from a base rate adjusted by the selected Risk Tolerance (${risk}) and Personality (${personality})]. Systems Analysis: [Explain the concise systems cause-and-effect chain (max 2 sentences)]."
+   - Every scenario MUST include a 'causal_chain' object representing 1st, 2nd, and 3rd order cascading consequences. The format is:
+     "causal_chain": {
+       "title": "1st Order Action (Immediate response/step)",
+       "probability": 100,
+       "next": {
+         "title": "2nd Order Consequence (Immediate secondary reaction)",
+         "probability": 75,
+         "next": {
+           "title": "3rd Order Impact (Long-term systemic result)",
+           "probability": 45
+         }
+       }
+     }
 6. STRUCTURED PERSPECTIVE SIMULATION:
    - Refine the multi-agent debate into a structured analysis of conflicting viewpoints. Structure 'boardroom_debate' with exactly 2 expert perspectives:
      * "Logical & Behavioral Perspective": Analyzes cognitive patterns, immediate impulses, and emotional framing.
@@ -260,7 +333,19 @@ Return response ONLY as a single valid JSON object following this structure:
       "risk_level": "low or medium or high",
       "emotional_impact": "Concise state",
       "probability": 45,
-      "reasoning": "Probability Heuristic: The probability of 45% is derived from... Systems Analysis: ..."
+      "reasoning": "Probability Heuristic: The probability of 45% is derived from... Systems Analysis: ...",
+      "causal_chain": {
+        "title": "1st Order Action",
+        "probability": 100,
+        "next": {
+          "title": "2nd Order Consequence",
+          "probability": 75,
+          "next": {
+            "title": "3rd Order Consequence",
+            "probability": 45
+          }
+        }
+      }
     }
   ],
   "key_factors_to_consider": [
@@ -598,7 +683,19 @@ function generateServerSimulation(decision, riskTolerance, personality) {
         risk_level: 'low',
         emotional_impact: 'Measured',
         probability: p1,
-        reasoning: `Probability Heuristic: The base rate of 75% is adjusted to ${p1}% based on a ${riskLabel} risk posture and a ${personalityLabel} decision lens. Systems Analysis: Slowing physical velocity prevents triggering automated prey or chase reflexes in domesticated animals.`
+        reasoning: `Probability Heuristic: The base rate of 75% is adjusted to ${p1}% based on a ${riskLabel} risk posture and a ${personalityLabel} decision lens. Systems Analysis: Slowing physical velocity prevents triggering automated prey or chase reflexes in domesticated animals.`,
+        causal_chain: {
+          title: 'Maintain low movement profile',
+          probability: 100,
+          next: {
+            title: 'Pet registers non-threatening visual cues',
+            probability: 80,
+            next: {
+              title: 'Pet disengages/settles in neutral state',
+              probability: 60
+            }
+          }
+        }
       },
       {
         title: 'High-Energy Play / Chase Activation',
@@ -607,7 +704,19 @@ function generateServerSimulation(decision, riskTolerance, personality) {
         risk_level: 'medium',
         emotional_impact: 'Anxious',
         probability: p2,
-        reasoning: `Probability Heuristic: The base rate of 45% is adjusted to ${p2}% based on a ${riskLabel} risk posture and a ${personalityLabel} decision lens. Systems Analysis: Rapid movement triggers instinctual prey drive mechanisms.`
+        reasoning: `Probability Heuristic: The base rate of 45% is adjusted to ${p2}% based on a ${riskLabel} risk posture and a ${personalityLabel} decision lens. Systems Analysis: Rapid movement triggers instinctual prey drive mechanisms.`,
+        causal_chain: {
+          title: 'Initiate sudden acceleration/flight response',
+          probability: 100,
+          next: {
+            title: 'Pet activates instinctual chase response',
+            probability: 85,
+            next: {
+              title: 'Accidental collision, bite, or scratch occurs',
+              probability: 55
+            }
+          }
+        }
       },
       {
         title: 'Guided Redirection',
@@ -616,7 +725,19 @@ function generateServerSimulation(decision, riskTolerance, personality) {
         risk_level: 'low',
         emotional_impact: 'Optimistic',
         probability: p3,
-        reasoning: `Probability Heuristic: The base rate of 80% is adjusted to ${p3}% based on a ${riskLabel} risk posture and a ${personalityLabel} decision lens. Systems Analysis: Stimulus substitution effectively transfers focus from human movement to a primary reward.`
+        reasoning: `Probability Heuristic: The base rate of 80% is adjusted to ${p3}% based on a ${riskLabel} risk posture and a ${personalityLabel} decision lens. Systems Analysis: Stimulus substitution effectively transfers focus from human movement to a primary reward.`,
+        causal_chain: {
+          title: 'Deploy high-value food or toy stimulus',
+          probability: 100,
+          next: {
+            title: 'Pet shifts focus from human to object',
+            probability: 90,
+            next: {
+              title: 'Safe distance established and behavior reset',
+              probability: 80
+            }
+          }
+        }
       }
     ];
 
@@ -647,7 +768,19 @@ function generateServerSimulation(decision, riskTolerance, personality) {
         risk_level: 'low',
         emotional_impact: 'Measured',
         probability: p1,
-        reasoning: `Probability Heuristic: The base rate of 75% is adjusted to ${p1}% based on a ${riskLabel} risk posture and a ${personalityLabel} decision lens. Systems Analysis: Minimizing physical exertion accelerates viral clearance and prevents contagion vectors.`
+        reasoning: `Probability Heuristic: The base rate of 75% is adjusted to ${p1}% based on a ${riskLabel} risk posture and a ${personalityLabel} decision lens. Systems Analysis: Minimizing physical exertion accelerates viral clearance and prevents contagion vectors.`,
+        causal_chain: {
+          title: 'Notify stakeholders & request remote options',
+          probability: 100,
+          next: {
+            title: 'Reduce immediate physical/cognitive metabolic drain',
+            probability: 95,
+            next: {
+              title: 'Accelerated recovery & zero community transmission',
+              probability: 85
+            }
+          }
+        }
       },
       {
         title: 'Pushing Through & Performance Deficit',
@@ -656,7 +789,19 @@ function generateServerSimulation(decision, riskTolerance, personality) {
         risk_level: 'high',
         emotional_impact: 'Anxious',
         probability: p2,
-        reasoning: `Probability Heuristic: The base rate of 35% is adjusted to ${p2}% based on a ${riskLabel} risk posture and a ${personalityLabel} decision lens. Systems Analysis: Immunological resource diversion limits active focus and performance.`
+        reasoning: `Probability Heuristic: The base rate of 35% is adjusted to ${p2}% based on a ${riskLabel} risk posture and a ${personalityLabel} decision lens. Systems Analysis: Immunological resource diversion limits active focus and performance.`,
+        causal_chain: {
+          title: 'Attend workplace/school despite symptoms',
+          probability: 100,
+          next: {
+            title: 'Symptom severity increases and attention lapses',
+            probability: 70,
+            next: {
+              title: 'Prolonged recovery window & peer exposure occurs',
+              probability: 60
+            }
+          }
+        }
       }
     ];
 
@@ -679,7 +824,19 @@ function generateServerSimulation(decision, riskTolerance, personality) {
         risk_level: 'high',
         emotional_impact: 'Impulsive',
         probability: p1,
-        reasoning: `Probability Heuristic: The base rate of 60% is adjusted to ${p1}% based on a ${riskLabel} risk posture and a ${personalityLabel} decision lens. Systems Analysis: Temporal discounting favors short-term rewards over long-term task completion.`
+        reasoning: `Probability Heuristic: The base rate of 60% is adjusted to ${p1}% based on a ${riskLabel} risk posture and a ${personalityLabel} decision lens. Systems Analysis: Temporal discounting favors short-term rewards over long-term task completion.`,
+        causal_chain: {
+          title: 'Initiate leisure activities/gaming immediately',
+          probability: 100,
+          next: {
+            title: 'Stress levels temporarily drop while task backlog rises',
+            probability: 90,
+            next: {
+              title: 'Severe panic/rushed execution at deadline',
+              probability: 75
+            }
+          }
+        }
       },
       {
         title: 'Disciplined Task Execution',
@@ -688,7 +845,19 @@ function generateServerSimulation(decision, riskTolerance, personality) {
         risk_level: 'low',
         emotional_impact: 'Objective',
         probability: p2,
-        reasoning: `Probability Heuristic: The base rate of 70% is adjusted to ${p2}% based on a ${riskLabel} risk posture and a ${personalityLabel} decision lens. Systems Analysis: Delaying gratification minimizes deadline pressure and protects cognitive margins.`
+        reasoning: `Probability Heuristic: The base rate of 70% is adjusted to ${p2}% based on a ${riskLabel} risk posture and a ${personalityLabel} decision lens. Systems Analysis: Delaying gratification minimizes deadline pressure and protects cognitive margins.`,
+        causal_chain: {
+          title: 'Begin structured productivity block',
+          probability: 100,
+          next: {
+            title: 'Substantial progress achieved on critical deliverables',
+            probability: 85,
+            next: {
+              title: 'Unlock guilt-free high-quality leisure hours later',
+              probability: 80
+            }
+          }
+        }
       }
     ];
 
@@ -715,7 +884,19 @@ function generateServerSimulation(decision, riskTolerance, personality) {
         risk_level: 'low',
         emotional_impact: 'Objective',
         probability: p1,
-        reasoning: `Probability Heuristic: The base rate of 65% is adjusted to ${p1}% based on a ${riskLabel} risk posture and a ${personalityLabel} decision lens. Systems Analysis: External skin discoloration rarely correlates with systemic organic toxicity.`
+        reasoning: `Probability Heuristic: The base rate of 65% is adjusted to ${p1}% based on a ${riskLabel} risk posture and a ${personalityLabel} decision lens. Systems Analysis: External skin discoloration rarely correlates with systemic organic toxicity.`,
+        causal_chain: {
+          title: 'Consume item after trimming bruised exterior',
+          probability: 100,
+          next: {
+            title: 'Gastrointestinal tract processes normal nutrients',
+            probability: 95,
+            next: {
+              title: 'Zero metabolic disruption & zero food waste',
+              probability: 90
+            }
+          }
+        }
       },
       {
         title: 'Active Pathogen Ingestion',
@@ -724,7 +905,19 @@ function generateServerSimulation(decision, riskTolerance, personality) {
         risk_level: 'high',
         emotional_impact: 'Skeptical',
         probability: p2,
-        reasoning: `Probability Heuristic: The base rate of 25% is adjusted to ${p2}% based on a ${riskLabel} risk posture and a ${personalityLabel} decision lens. Systems Analysis: Ingesting mold or bacterial strains overwhelms baseline digestive defenses.`
+        reasoning: `Probability Heuristic: The base rate of 25% is adjusted to ${p2}% based on a ${riskLabel} risk posture and a ${personalityLabel} decision lens. Systems Analysis: Ingesting mold or bacterial strains overwhelms baseline digestive defenses.`,
+        causal_chain: {
+          title: 'Consume questionable food item containing rot',
+          probability: 100,
+          next: {
+            title: 'Pathogenic colonies bypass stomach acid defenses',
+            probability: 60,
+            next: {
+              title: 'Gastrointestinal distress & systemic performance depletion',
+              probability: 50
+            }
+          }
+        }
       }
     ];
 
@@ -764,7 +957,19 @@ function generateServerSimulation(decision, riskTolerance, personality) {
         risk_level: 'medium',
         emotional_impact: 'Measured',
         probability: p1,
-        reasoning: `Probability Heuristic: The base rate of 65% is adjusted to ${p1}% based on a ${riskLabel} risk posture and a ${personalityLabel} decision lens. Systems Analysis: Active commitment of attention produces direct feedback but reduces overall flexibility.`
+        reasoning: `Probability Heuristic: The base rate of 65% is adjusted to ${p1}% based on a ${riskLabel} risk posture and a ${personalityLabel} decision lens. Systems Analysis: Active commitment of attention produces direct feedback but reduces overall flexibility.`,
+        causal_chain: {
+          title: 'Commit resources and execute immediate plans',
+          probability: 100,
+          next: {
+            title: 'Encounter real-world friction and feedback loops',
+            probability: 80,
+            next: {
+              title: 'Outcome realization with variable resource depletion',
+              probability: 65
+            }
+          }
+        }
       },
       {
         title: 'Defensive Deferral & Preservation',
@@ -773,7 +978,19 @@ function generateServerSimulation(decision, riskTolerance, personality) {
         risk_level: 'low',
         emotional_impact: 'Objective',
         probability: p2,
-        reasoning: `Probability Heuristic: The base rate of 75% is adjusted to ${p2}% based on a ${riskLabel} risk posture and a ${personalityLabel} decision lens. Systems Analysis: Maintaining the status quo minimizes risk exposure while information is incomplete.`
+        reasoning: `Probability Heuristic: The base rate of 75% is adjusted to ${p2}% based on a ${riskLabel} risk posture and a ${personalityLabel} decision lens. Systems Analysis: Maintaining the status quo minimizes risk exposure while information is incomplete.`,
+        causal_chain: {
+          title: 'Postpone action and monitor environment indicators',
+          probability: 100,
+          next: {
+            title: 'Maintain current resource baseline and flexibility',
+            probability: 90,
+            next: {
+              title: 'Avoid short-term volatility but defer potential yields',
+              probability: 75
+            }
+          }
+        }
       }
     ];
 
