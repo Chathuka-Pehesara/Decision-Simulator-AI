@@ -694,3 +694,77 @@ function generateOfflineSimulation(decision, riskTolerance, personality) {
     final_note: `This simulation outlines potential scenarios based on a risk profile of ${riskLabel} and a ${personalityLabel} decision-making lens. It represents a theoretical modeling of possibilities using current behavioral heuristics, and is not, under any circumstances, to be considered direct personal, career, financial, or legal advice. Every decision carries unique real-world variables; maintain independent agency and exercise personal caution.`
   };
 }
+
+/**
+ * Fetch Socratic probing questions for a decision
+ */
+export async function getSocraticQuestions(decision) {
+  const normalized = normalizeInput(decision);
+  try {
+    const socraticUrl = API_URL.replace('/simulate', '/socratic-questions');
+    const response = await api.post(socraticUrl, { decision: normalized });
+    return response.data;
+  } catch (error) {
+    console.warn('Backend Socratic connection failed, executing local fallback...', error.message);
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    return generateOfflineSocraticQuestions(normalized);
+  }
+}
+
+/**
+ * Generate local offline Socratic questions
+ */
+function generateOfflineSocraticQuestions(decision) {
+  const norm = decision.toLowerCase();
+  const healthSymptoms = ['stomach', 'pain', 'ache', 'sick', 'ill', 'fever', 'flu', 'cough', 'cold', 'headache'];
+  const careerWords = ['job', 'offer', 'career', 'promote', 'resign', 'quit', 'interview'];
+  const petWords = ['cat', 'dog', 'pet', 'animal', 'bird', 'vet', 'feed'];
+  const foodItems = ['eat', 'drink', 'consume', 'apple', 'food', 'meat', 'milk'];
+
+  if (healthSymptoms.some(word => norm.includes(word))) {
+    return {
+      questions: [
+        "How long have you experienced these symptoms, and have they worsened?",
+        "Do you have critical tasks today that require your physical presence?",
+        "Have you consulted a medical professional or taken any diagnostic actions?",
+        "What are the immediate consequences if you take a sick day today?"
+      ]
+    };
+  } else if (careerWords.some(word => norm.includes(word))) {
+    return {
+      questions: [
+        "What is the primary driver of this career transition (financial, cultural, or burn-out)?",
+        "How many months of financial runway do you have saved in your stability reserve?",
+        "Have you secured a formal written contract or just a verbal offer?",
+        "How does this move align with your long-term 3-year professional roadmap?"
+      ]
+    };
+  } else if (petWords.some(word => norm.includes(word))) {
+    return {
+      questions: [
+        "Have you observed similar behavior from this pet in the past?",
+        "Is there a safe treat or toy immediately available to redirect its focus?",
+        "Does the animal show indicators of anxiety or defensive posturing?",
+        "Is the immediate physical environment free of other hazards?"
+      ]
+    };
+  } else if (foodItems.some(word => norm.includes(word))) {
+    return {
+      questions: [
+        "Does the food item show visible decay, mold, or an off smell?",
+        "How critical is this consumption to your immediate metabolic/energy needs?",
+        "Do you have alternative, spotless food items readily available?",
+        "Is there any thermal sterilization (cooking/boiling) option available?"
+      ]
+    };
+  }
+
+  return {
+    questions: [
+      "What is the worst-case scenario if you proceed with this decision immediately?",
+      "Are there alternative options that do not involve a binary 'yes' or 'no' path?",
+      "What is the reversibility index of this choice if you encounter friction?",
+      "What critical information is currently missing from your decision-making equation?"
+    ]
+  };
+}

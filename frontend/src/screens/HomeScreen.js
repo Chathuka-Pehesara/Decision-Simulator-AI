@@ -16,7 +16,7 @@ import {
 import Dropdown from '../components/Dropdown';
 import Card from '../components/Card';
 import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY } from '../styles/theme';
-import { simulateDecision } from '../services/api';
+import { simulateDecision, getSocraticQuestions } from '../services/api';
 import { saveSimulation } from '../services/storage';
 
 // Dot-Dash Glowing Separator Line
@@ -94,6 +94,13 @@ export default function HomeScreen({ navigation, route }) {
   const [loading, setLoading] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
 
+  // Socratic Mode States
+  const [socraticMode, setSocraticMode] = useState(false);
+  const [socraticStep, setSocraticStep] = useState(false);
+  const [socraticQuestions, setSocraticQuestions] = useState([]);
+  const [socraticAnswers, setSocraticAnswers] = useState({});
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(40)).current;
@@ -160,9 +167,33 @@ export default function HomeScreen({ navigation, route }) {
       return;
     }
 
+    if (socraticMode) {
+      setLoading(true);
+      try {
+        const data = await getSocraticQuestions(decision.trim());
+        if (data && data.questions && data.questions.length > 0) {
+          setSocraticQuestions(data.questions);
+          setSocraticAnswers({});
+          setCurrentQuestionIndex(0);
+          setSocraticStep(true);
+        } else {
+          await runDirectSimulation(decision.trim());
+        }
+      } catch (error) {
+        Alert.alert('Socratic Probe Error', 'Failed to generate Socratic questions. Proceeding directly...');
+        await runDirectSimulation(decision.trim());
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      await runDirectSimulation(decision.trim());
+    }
+  };
+
+  const runDirectSimulation = async (queryText) => {
     setLoading(true);
     try {
-      const result = await simulateDecision(decision.trim(), risk, personality);
+      const result = await simulateDecision(queryText, risk, personality);
       const savedRecord = await saveSimulation(decision.trim(), result);
       
       navigation.navigate('Result', { 
@@ -172,10 +203,41 @@ export default function HomeScreen({ navigation, route }) {
       });
       
       setDecision('');
+      setSocraticStep(false);
+      setSocraticQuestions([]);
+      setSocraticAnswers({});
     } catch (error) {
       Alert.alert('Simulation Error', 'Failed to generate simulation results. Please try again.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSocraticNext = async () => {
+    const currentAnswer = socraticAnswers[currentQuestionIndex] || '';
+    if (!currentAnswer.trim()) {
+      Alert.alert('Response Required', 'Please provide a response before proceeding.');
+      return;
+    }
+
+    if (currentQuestionIndex < socraticQuestions.length - 1) {
+      setCurrentQuestionIndex(currentQuestionIndex + 1);
+    } else {
+      let compiledQuery = decision.trim() + "\n\nUser Clarifications:\n";
+      socraticQuestions.forEach((q, idx) => {
+        compiledQuery += `- Question: ${q}\n  Answer: ${socraticAnswers[idx]}\n`;
+      });
+      await runDirectSimulation(compiledQuery);
+    }
+  };
+
+  const handleSocraticBack = () => {
+    if (currentQuestionIndex > 0) {
+      setCurrentQuestionIndex(currentQuestionIndex - 1);
+    } else {
+      setSocraticStep(false);
+      setSocraticQuestions([]);
+      setSocraticAnswers({});
     }
   };
 
@@ -230,64 +292,129 @@ export default function HomeScreen({ navigation, route }) {
                 />
               )}
 
-              <Text style={styles.inputLabel}>Describe Your Decision</Text>
-              <DotDashSeparator />
-              
-              <TextInput
-                style={[
-                  styles.textInput, 
-                  isFocused && styles.textInputFocused,
-                  Platform.OS === 'web' && WEB_STYLES.textInput,
-                  Platform.OS === 'web' && isFocused && WEB_STYLES.textInputFocused
-                ]}
-                multiline
-                numberOfLines={4}
-                placeholder="e.g., Should I accept the senior software engineer offer at the startup, or stay in my stable corporate role?"
-                placeholderTextColor="#587396"
-                value={decision}
-                onChangeText={setDecision}
-                textAlignVertical="top"
-                editable={!loading}
-                onFocus={() => setIsFocused(true)}
-                onBlur={() => setIsFocused(false)}
-              />
+              {socraticStep ? (
+                <View>
+                  <Text style={styles.socraticHeader}>🧠 SOCRATIC COGNITIVE CHALLENGE</Text>
+                  <Text style={styles.socraticSub}>Refine unstated parameters and cognitive assumptions.</Text>
+                  <DotDashSeparator />
+                  
+                  <Text style={styles.socraticProgress}>
+                    QUESTION {currentQuestionIndex + 1} OF {socraticQuestions.length}
+                  </Text>
+                  
+                  <Text style={styles.socraticQuestionText}>
+                    {socraticQuestions[currentQuestionIndex]}
+                  </Text>
+                  
+                  <TextInput
+                    style={[
+                      styles.textInput,
+                      styles.socraticInput
+                    ]}
+                    multiline
+                    numberOfLines={3}
+                    placeholder="Type your response here..."
+                    placeholderTextColor="#587396"
+                    value={socraticAnswers[currentQuestionIndex] || ''}
+                    onChangeText={(text) => setSocraticAnswers({ ...socraticAnswers, [currentQuestionIndex]: text })}
+                    textAlignVertical="top"
+                    editable={!loading}
+                  />
+                  
+                  <View style={styles.socraticBtnRow}>
+                    <TouchableOpacity
+                      style={styles.socraticBackBtn}
+                      onPress={handleSocraticBack}
+                      disabled={loading}
+                    >
+                      <Text style={styles.socraticBackBtnText}>BACK</Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity
+                      style={styles.socraticNextBtn}
+                      onPress={handleSocraticNext}
+                      disabled={loading}
+                    >
+                      <Text style={styles.socraticNextBtnText}>
+                        {currentQuestionIndex === socraticQuestions.length - 1 ? (loading ? 'ANALYZING...' : 'SIMULATE FUTURES') : 'NEXT'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : (
+                <View>
+                  <Text style={styles.inputLabel}>Describe Your Decision</Text>
+                  <DotDashSeparator />
+                  
+                  <TextInput
+                    style={[
+                      styles.textInput, 
+                      isFocused && styles.textInputFocused,
+                      Platform.OS === 'web' && WEB_STYLES.textInput,
+                      Platform.OS === 'web' && isFocused && WEB_STYLES.textInputFocused
+                    ]}
+                    multiline
+                    numberOfLines={4}
+                    placeholder="e.g., Should I accept the senior software engineer offer at the startup, or stay in my stable corporate role?"
+                    placeholderTextColor="#587396"
+                    value={decision}
+                    onChangeText={setDecision}
+                    textAlignVertical="top"
+                    editable={!loading}
+                    onFocus={() => setIsFocused(true)}
+                    onBlur={() => setIsFocused(false)}
+                  />
 
-              {/* Dropdowns */}
-              <Dropdown
-                label="Risk Tolerance"
-                placeholder="Select risk level..."
-                selectedValue={risk}
-                onValueChange={setRisk}
-                options={riskOptions}
-              />
+                  {/* Dropdowns */}
+                  <Dropdown
+                    label="Risk Tolerance"
+                    placeholder="Select risk level..."
+                    selectedValue={risk}
+                    onValueChange={setRisk}
+                    options={riskOptions}
+                  />
 
-              <Dropdown
-                label="Personality Focus"
-                placeholder="Select decision style..."
-                selectedValue={personality}
-                onValueChange={setPersonality}
-                options={personalityOptions}
-              />
+                  <Dropdown
+                    label="Personality Focus"
+                    placeholder="Select decision style..."
+                    selectedValue={personality}
+                    onValueChange={setPersonality}
+                    options={personalityOptions}
+                  />
 
-              {/* Loop Animated Gradient Simulated Button */}
-              <TouchableOpacity
-                activeOpacity={0.85}
-                onPress={handleSimulate}
-                disabled={loading}
-                style={[
-                  styles.simulateBtnContainer,
-                  Platform.OS === 'web' && WEB_STYLES.simulateBtnContainer,
-                  Platform.OS === 'web' && {
-                    background: 'linear-gradient(-45deg, #00e5ff, #a855f7, #00e5ff, #a855f7)',
-                    backgroundSize: '400% 400%',
-                    animation: 'btnGradientSweep 6s infinite ease',
-                  }
-                ]}
-              >
-                <Text style={styles.simulateBtnText}>
-                  {loading ? 'ANALYZING THREADS...' : 'SIMULATE FUTURES'}
-                </Text>
-              </TouchableOpacity>
+                  {/* Socratic Toggle Switch */}
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => setSocraticMode(!socraticMode)}
+                    style={styles.socraticToggle}
+                  >
+                    <View style={[styles.checkbox, socraticMode && styles.checkboxChecked]}>
+                      {socraticMode && <View style={styles.checkboxInner} />}
+                    </View>
+                    <Text style={styles.socraticToggleText}>Activate Socratic Pre-Analysis Mode</Text>
+                  </TouchableOpacity>
+
+                  {/* Loop Animated Gradient Simulated Button */}
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={handleSimulate}
+                    disabled={loading}
+                    style={[
+                      styles.simulateBtnContainer,
+                      Platform.OS === 'web' && WEB_STYLES.simulateBtnContainer,
+                      Platform.OS === 'web' && {
+                        background: 'linear-gradient(-45deg, #00e5ff, #a855f7, #00e5ff, #a855f7)',
+                        backgroundSize: '400% 400%',
+                        animation: 'btnGradientSweep 6s infinite ease',
+                      }
+                    ]}
+                  >
+                    <Text style={styles.simulateBtnText}>
+                      {loading ? 'ANALYZING THREADS...' : 'SIMULATE FUTURES'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </Card>
 
             {/* Bottom Glassmorphism Buttons (Left: Amber, Right: Magenta) */}
@@ -501,6 +628,120 @@ const styles = StyleSheet.create({
     shadowColor: '#00e5ff',
     shadowOpacity: 0.8,
     shadowRadius: 4,
+  },
+  socraticToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: SPACING.md,
+    marginBottom: SPACING.lg,
+    paddingVertical: 4,
+  },
+  checkbox: {
+    width: 18,
+    height: 18,
+    borderWidth: 1.5,
+    borderColor: 'rgba(0, 229, 255, 0.4)',
+    borderRadius: BORDER_RADIUS.sm,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: SPACING.sm,
+    backgroundColor: 'rgba(3, 5, 13, 0.6)',
+  },
+  checkboxChecked: {
+    borderColor: '#00e5ff',
+    backgroundColor: 'rgba(0, 229, 255, 0.1)',
+  },
+  checkboxInner: {
+    width: 8,
+    height: 8,
+    backgroundColor: '#00e5ff',
+    borderRadius: 1,
+    shadowColor: '#00e5ff',
+    shadowOpacity: 0.8,
+    shadowRadius: 4,
+  },
+  socraticToggleText: {
+    fontFamily: 'Orbitron',
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#00e5ff',
+    letterSpacing: 0.5,
+  },
+  socraticHeader: {
+    fontFamily: 'Orbitron',
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#00e5ff',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  socraticSub: {
+    ...TYPOGRAPHY.body,
+    color: '#587396',
+    fontSize: 11,
+    marginTop: 4,
+    lineHeight: 16,
+  },
+  socraticProgress: {
+    fontFamily: 'Orbitron',
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#a855f7',
+    letterSpacing: 1.5,
+    marginTop: SPACING.sm,
+    marginBottom: SPACING.sm,
+  },
+  socraticQuestionText: {
+    fontFamily: 'IBM Plex Mono',
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#F8FAFC',
+    lineHeight: 22,
+    marginBottom: SPACING.md,
+  },
+  socraticInput: {
+    minHeight: 80,
+    marginBottom: SPACING.lg,
+  },
+  socraticBtnRow: {
+    flexDirection: 'row',
+    gap: SPACING.md,
+  },
+  socraticBackBtn: {
+    flex: 1,
+    height: 48,
+    borderWidth: 1.5,
+    borderColor: 'rgba(244, 63, 94, 0.3)',
+    backgroundColor: 'rgba(244, 63, 94, 0.03)',
+    borderRadius: BORDER_RADIUS.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  socraticBackBtnText: {
+    fontFamily: 'Orbitron',
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#f43f5e',
+    letterSpacing: 1,
+  },
+  socraticNextBtn: {
+    flex: 2,
+    height: 48,
+    backgroundColor: '#00e5ff',
+    borderRadius: BORDER_RADIUS.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#00e5ff',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+  },
+  socraticNextBtnText: {
+    fontFamily: 'Orbitron',
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#03050d',
+    letterSpacing: 1,
   },
   iconContainer: {
     justifyContent: 'center',

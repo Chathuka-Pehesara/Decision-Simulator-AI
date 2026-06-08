@@ -367,6 +367,37 @@ export default function ResultScreen({ route, navigation }) {
           <Text style={styles.bannerTitle}>"{decision}"</Text>
         </Animated.View>
 
+        {/* Emotional Context Alert Layer */}
+        {simulation.emotional_analysis?.distortion_flag && (
+          <Card style={styles.emotionalWarningCard} outlined shadowed={false}>
+            <View style={styles.emotionalWarningHeader}>
+              <Text style={styles.emotionalWarningIcon}>⚠️</Text>
+              <Text style={styles.emotionalWarningTitle}>
+                HIGH EMOTIONAL INTENSITY DETECTED ({simulation.emotional_analysis.intensity_score}%)
+              </Text>
+            </View>
+            <Text style={styles.emotionalWarningText}>
+              Primary Emotion detected: <Text style={styles.boldText}>{simulation.emotional_analysis.primary_emotion?.toUpperCase()}</Text>. 
+              Stress, fear, or urgency can trigger immediate gratification impulses and cloud long-term probability modeling.
+            </Text>
+            {simulation.emotional_analysis.cooldown_reframe && (
+              <View style={styles.cooldownReframeBox}>
+                <Text style={styles.cooldownReframeLabel}>OBJECTIVE COOL-DOWN REFRAME:</Text>
+                <Text style={styles.cooldownReframeText}>"{simulation.emotional_analysis.cooldown_reframe}"</Text>
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  style={styles.cooldownReframeBtn}
+                  onPress={() => {
+                    navigation.navigate('Home', { reframedDecision: simulation.emotional_analysis.cooldown_reframe });
+                  }}
+                >
+                  <Text style={styles.cooldownReframeBtnText}>SIMULATE COOL-DOWN FORMULATION</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </Card>
+        )}
+
         {/* SECTION 1: COGNITIVE BIAS ANALYZER (FULL WIDTH PANEL) */}
         <Animated.View style={{ opacity: biasFade }}>
           <SectionHeaderChip title="🧠 Cognitive Bias Analyzer" svgIconHtml={brainSvg} />
@@ -1136,6 +1167,82 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#03050d',
     letterSpacing: 1.5,
+  },
+  emotionalWarningCard: {
+    backgroundColor: 'rgba(244, 63, 94, 0.04)',
+    borderColor: 'rgba(244, 63, 94, 0.35)',
+    borderWidth: 1.5,
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
+    marginBottom: SPACING.xl,
+  },
+  emotionalWarningHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: SPACING.sm,
+  },
+  emotionalWarningIcon: {
+    fontSize: 16,
+    marginRight: SPACING.sm,
+  },
+  emotionalWarningTitle: {
+    fontFamily: 'Orbitron',
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#f43f5e',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  emotionalWarningText: {
+    fontFamily: 'IBM Plex Mono',
+    fontSize: 12,
+    color: '#E2E8F0',
+    lineHeight: 18,
+    marginBottom: SPACING.md,
+  },
+  boldText: {
+    fontWeight: 'bold',
+    color: '#f43f5e',
+  },
+  cooldownReframeBox: {
+    backgroundColor: 'rgba(3, 5, 13, 0.5)',
+    borderColor: 'rgba(244, 63, 94, 0.15)',
+    borderWidth: 1,
+    borderRadius: BORDER_RADIUS.sm,
+    padding: SPACING.md,
+    marginTop: SPACING.xs,
+  },
+  cooldownReframeLabel: {
+    fontFamily: 'Orbitron',
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#587396',
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  cooldownReframeText: {
+    fontFamily: 'IBM Plex Mono',
+    fontSize: 12,
+    color: '#F8FAFC',
+    lineHeight: 18,
+    fontStyle: 'italic',
+    marginBottom: SPACING.md,
+  },
+  cooldownReframeBtn: {
+    height: 38,
+    backgroundColor: 'rgba(244, 63, 94, 0.08)',
+    borderColor: 'rgba(244, 63, 94, 0.25)',
+    borderWidth: 1.5,
+    borderRadius: BORDER_RADIUS.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cooldownReframeBtnText: {
+    fontFamily: 'Orbitron',
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#f43f5e',
+    letterSpacing: 1,
   },
   nativeGaugeTrack: {
     height: 10,

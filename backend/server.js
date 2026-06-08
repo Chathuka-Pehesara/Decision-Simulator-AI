@@ -208,21 +208,27 @@ INSTRUCTIONS:
    - Calculate a grounded 'bias_score' (0-100) based on loaded language (+15), temporal discounting (+20), loss aversion framing (+25), and absence of options (+20).
    - List 1 to 3 'detected_biases' (name, severity: low/medium/high, and a concise 1-2 sentence academic explanation of its manifestation).
    - Provide a 'reframed_decision' (highly objective systems-level rephrasing).
-4. SCENARIO DIVERSIFICATION ENGINE:
+4. EMOTIONAL INTENSITY ENGINE:
+   - Scan the decision text for indicators of stress, urgency, anxiety, fear, anger, excitement, or panic.
+   - Calculate a grounded 'intensity_score' (0-100) based on vocabulary, word choice, punctuation, and structural pressure.
+   - Detail the 'primary_emotion' (e.g., stress, urgency, fear, anxiety, anger, balanced).
+   - Set 'distortion_flag' (boolean) to true if the intensity_score is above 50.
+   - Formulate a 'cooldown_reframe' (a calm, systems-level, highly objective rephrasing of the decision query that strips away all subjective urgency or anxiety).
+5. SCENARIO DIVERSIFICATION ENGINE:
    - Model exactly 3 highly realistic, distinct future scenarios representing tradeoffs, conflicting outcomes, and alternative behavioral tracks.
    - Keep each scenario's 'description' limited to exactly 1-2 concise, analytical sentences.
    - Keep 'emotional_impact' to a concise 1-2 word professional state.
    - Every scenario's 'reasoning' block MUST be formatted exactly as:
      "Probability Heuristic: [Explain how the X% probability is derived from a base rate adjusted by the selected Risk Tolerance (${risk}) and Personality (${personality})]. Systems Analysis: [Explain the concise systems cause-and-effect chain (max 2 sentences)]."
-5. STRUCTURED PERSPECTIVE SIMULATION:
+6. STRUCTURED PERSPECTIVE SIMULATION:
    - Refine the multi-agent debate into a structured analysis of conflicting viewpoints. Structure 'boardroom_debate' with exactly 2 expert perspectives:
      * "Logical & Behavioral Perspective": Analyzes cognitive patterns, immediate impulses, and emotional framing.
      * "Risk & Sustainability Perspective": Analyzes long-term viability, resource preservation, and environmental trade-offs.
    - Keep each perspective message limited to exactly 1-2 highly polished systems-thinking sentences. No dialogue tags, slang, or theatrical arguments.
    - Summarize their consensus into a single-sentence 'consensus_summary'.
-6. KEY FACTORS:
+7. KEY FACTORS:
    - Provide exactly 4 concise key factors to monitor, limited to exactly 6-8 words each.
-7. CRITICAL LANGUAGE & TONE RULES:
+8. CRITICAL LANGUAGE & TONE RULES:
    - Use objective, professional decision-science terminology (e.g. "temporal discounting", "marginal utility", "variance", "sustainability limit").
    - Strictly prohibit theatrical or dramatic AI words (e.g. "catastrophic", "dreaded collapse", "dopamine hit", "doom", "ruin").
    - Do NOT give direct advice or recommendations.
@@ -239,6 +245,12 @@ Return response ONLY as a single valid JSON object following this structure:
       "Limitation 2",
       "Limitation 3"
     ]
+  },
+  "emotional_analysis": {
+    "intensity_score": 70,
+    "primary_emotion": "Urgency & Stress",
+    "distortion_flag": true,
+    "cooldown_reframe": "Standardized objective rephrase without urgency"
   },
   "scenarios": [
     {
@@ -823,6 +835,32 @@ function generateServerSimulation(decision, riskTolerance, personality) {
     consensusSummary = "Pursue the action through small, low-risk experiments to validate outcomes before committing significant resources.";
   }
 
+  // Heuristic Emotional Analysis
+  const emotionalWords = ['now', 'immediate', 'fast', 'quit', 'resign', 'leave', 'stress', 'stressed', 'anxious', 'nervous', 'panic', 'urgent', 'urgency', 'scared', 'afraid', 'fever', 'pain', 'ache', 'sick'];
+  let intensityScore = 15;
+  let primaryEmotion = 'balanced';
+  
+  const matches = cleanNorm.split(' ').filter(w => emotionalWords.includes(w));
+  if (matches.length > 0) {
+    intensityScore = Math.min(95, 30 + matches.length * 15);
+    if (cleanNorm.includes('now') || cleanNorm.includes('immediate') || cleanNorm.includes('urgent')) {
+      primaryEmotion = 'urgency';
+    } else if (cleanNorm.includes('stress') || cleanNorm.includes('anxious') || cleanNorm.includes('panic')) {
+      primaryEmotion = 'stress / anxiety';
+    } else if (cleanNorm.includes('scared') || cleanNorm.includes('afraid')) {
+      primaryEmotion = 'fear';
+    } else {
+      primaryEmotion = 'heightened arousal';
+    }
+  }
+  
+  const emotionalAnalysis = {
+    intensity_score: intensityScore,
+    primary_emotion: primaryEmotion,
+    distortion_flag: intensityScore > 50,
+    cooldown_reframe: reframedDecision
+  };
+
   return {
     decision_summary: decision,
     confidence_assessment: {
@@ -830,6 +868,7 @@ function generateServerSimulation(decision, riskTolerance, personality) {
       score: confidenceScore,
       limitations: confidenceLimitations
     },
+    emotional_analysis: emotionalAnalysis,
     scenarios: scenarios,
     key_factors_to_consider: keyFactors,
     cognitive_analysis: {
@@ -843,6 +882,160 @@ function generateServerSimulation(decision, riskTolerance, personality) {
       consensus_summary: consensusSummary
     },
     final_note: `This simulation outlines potential scenarios based on a risk profile of ${riskLabel} and a ${personalityLabel} decision-making lens. It represents a theoretical modeling of possibilities using current behavioral heuristics, and is not, under any circumstances, to be considered direct personal, career, financial, or legal advice. Every decision carries unique real-world variables; maintain independent agency and exercise personal caution.`
+  };
+}
+
+/**
+ * POST /socratic-questions
+ * Receives: { decision }
+ * Contacts Gemini API to generate 3 to 5 custom probing questions.
+ */
+app.post('/socratic-questions', async (req, res) => {
+  const { decision } = req.body;
+  if (!decision || !decision.trim()) {
+    return res.status(400).json({ error: 'Decision string is required.' });
+  }
+
+  const normalized = normalizeInput(decision);
+  const apiKey = process.env.GEMINI_API_KEY;
+
+  if (apiKey) {
+    console.log(`[AI MODE] Generating Socratic questions for: "${normalized}"`);
+    try {
+      const result = await generateGeminiSocraticQuestions(normalized, apiKey);
+      return res.json(result);
+    } catch (err) {
+      console.error('[AI MODE ERROR] Failed calling Gemini for Socratic questions, falling back...', err.message);
+      const fallbackResult = generateLocalSocraticQuestions(normalized);
+      return res.json(fallbackResult);
+    }
+  } else {
+    console.log(`[SIMULATOR MODE] Serving local Socratic questions for: "${normalized}"`);
+    const fallbackResult = generateLocalSocraticQuestions(normalized);
+    return res.json(fallbackResult);
+  }
+});
+
+/**
+ * Call Gemini 2.5 Flash API to generate Socratic questions
+ */
+async function generateGeminiSocraticQuestions(decision, apiKey) {
+  const modelName = 'gemini-2.5-flash';
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+
+  const prompt = `You are "Decision Simulator AI", a Socratic guide and decision scientist.
+Generate exactly 3 to 5 highly relevant, probing, analytical questions for a user contemplating this decision query:
+Decision: "${decision}"
+
+INSTRUCTIONS:
+1. Target hidden assumptions, unstated constraints, personal preferences, and risk boundaries.
+2. Keep questions concise (max 12-15 words each).
+3. Do not be generic (e.g. "What is your budget?"). Customize to the specific decision.
+
+OUTPUT FORMAT:
+Return response ONLY as a single valid JSON object following this structure:
+{
+  "questions": [
+    "Question 1",
+    "Question 2",
+    "Question 3"
+  ]
+}
+
+Do NOT wrap the JSON inside markdown code blocks. Return raw JSON text only.`;
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => { controller.abort(); }, 20000);
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { responseMimeType: 'application/json' }
+      }),
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Gemini API returned status ${response.status}: ${errorText}`);
+    }
+
+    const data = await response.json();
+    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!rawText) throw new Error('Empty API response');
+
+    let cleanText = rawText.trim();
+    if (cleanText.includes('```json')) {
+      cleanText = cleanText.split('```json')[1].split('```')[0].trim();
+    } else if (cleanText.includes('```')) {
+      cleanText = cleanText.split('```')[1].split('```')[0].trim();
+    }
+    return JSON.parse(cleanText);
+  } catch (error) {
+    clearTimeout(timeoutId);
+    throw error;
+  }
+}
+
+/**
+ * Generate local Socratic questions as fallback
+ */
+function generateLocalSocraticQuestions(decision) {
+  const norm = decision.toLowerCase();
+  const healthSymptoms = ['stomach', 'pain', 'ache', 'sick', 'ill', 'fever', 'flu', 'cough', 'cold', 'headache'];
+  const careerWords = ['job', 'offer', 'career', 'promote', 'resign', 'quit', 'interview'];
+  const petWords = ['cat', 'dog', 'pet', 'animal', 'bird', 'vet', 'feed'];
+  const foodItems = ['eat', 'drink', 'consume', 'apple', 'food', 'meat', 'milk'];
+
+  if (healthSymptoms.some(word => norm.includes(word))) {
+    return {
+      questions: [
+        "How long have you experienced these symptoms, and have they worsened?",
+        "Do you have critical tasks today that require your physical presence?",
+        "Have you consulted a medical professional or taken any diagnostic actions?",
+        "What are the immediate consequences if you take a sick day today?"
+      ]
+    };
+  } else if (careerWords.some(word => norm.includes(word))) {
+    return {
+      questions: [
+        "What is the primary driver of this career transition (financial, cultural, or burn-out)?",
+        "How many months of financial runway do you have saved in your stability reserve?",
+        "Have you secured a formal written contract or just a verbal offer?",
+        "How does this move align with your long-term 3-year professional roadmap?"
+      ]
+    };
+  } else if (petWords.some(word => norm.includes(word))) {
+    return {
+      questions: [
+        "Have you observed similar behavior from this pet in the past?",
+        "Is there a safe treat or toy immediately available to redirect its focus?",
+        "Does the animal show indicators of anxiety or defensive posturing?",
+        "Is the immediate physical environment free of other hazards?"
+      ]
+    };
+  } else if (foodItems.some(word => norm.includes(word))) {
+    return {
+      questions: [
+        "Does the food item show visible decay, mold, or an off smell?",
+        "How critical is this consumption to your immediate metabolic/energy needs?",
+        "Do you have alternative, spotless food items readily available?",
+        "Is there any thermal sterilization (cooking/boiling) option available?"
+      ]
+    };
+  }
+
+  return {
+    questions: [
+      "What is the worst-case scenario if you proceed with this decision immediately?",
+      "Are there alternative options that do not involve a binary 'yes' or 'no' path?",
+      "What is the reversibility index of this choice if you encounter friction?",
+      "What critical information is currently missing from your decision-making equation?"
+    ]
   };
 }
 
