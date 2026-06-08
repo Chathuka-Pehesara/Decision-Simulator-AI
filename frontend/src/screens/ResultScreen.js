@@ -467,6 +467,27 @@ export default function ResultScreen({ route, navigation }) {
           <Text style={styles.bannerTitle}>"{decision}"</Text>
         </Animated.View>
 
+        {/* Temporal Memory Recall Warning Card */}
+        {simulation.temporal_memory_recall && (
+          <Card style={styles.memoryRecallCard} outlined shadowed={false}>
+            <View style={styles.memoryRecallHeader}>
+              <Text style={styles.memoryRecallIcon}>⏳</Text>
+              <Text style={styles.memoryRecallTitle}>
+                TEMPORAL LINK DETECTED ({simulation.temporal_memory_recall.similarity}% MATCH)
+              </Text>
+            </View>
+            <Text style={styles.memoryRecallText}>
+              You faced a similar decision query in the past:
+            </Text>
+            <Text style={styles.memoryRecallQuery}>
+              "{simulation.temporal_memory_recall.decision}"
+            </Text>
+            <Text style={styles.memoryRecallMeta}>
+              Simulated on {simulation.temporal_memory_recall.timestamp}. Expected summary: "{simulation.temporal_memory_recall.outcome_summary}"
+            </Text>
+          </Card>
+        )}
+
         {/* Emotional Context Alert Layer */}
         {simulation.emotional_analysis?.distortion_flag && (
           <Card style={styles.emotionalWarningCard} outlined shadowed={false}>
@@ -567,6 +588,62 @@ export default function ResultScreen({ route, navigation }) {
             )}
           </Card>
         </Animated.View>
+
+        {/* SECTION 2: MULTI-MODEL CONSENSUS (FULL WIDTH PANEL) */}
+        {simulation.multi_model_comparison && (
+          <Animated.View style={{ opacity: biasFade, marginTop: SPACING.lg }}>
+            <SectionHeaderChip title="🤖 Multi-Model Consensus" svgIconHtml={crystalBallSvg} />
+            <Card style={styles.consensusCard} outlined shadowed={false}>
+              <View style={styles.consensusHeader}>
+                <View style={styles.consensusMainRow}>
+                  <Text style={styles.consensusScoreLabel}>CONSENSUS INDEX: </Text>
+                  <Text style={[styles.consensusScoreValue, { color: simulation.multi_model_comparison.consensus_score >= 80 ? '#00e5ff' : '#fbbf24' }]}>
+                    {simulation.multi_model_comparison.consensus_score}%
+                  </Text>
+                  <View style={[styles.consensusLevelBadge, { borderColor: simulation.multi_model_comparison.consensus_score >= 80 ? '#00e5ff' : '#fbbf24' }]}>
+                    <Text style={[styles.consensusLevelText, { color: simulation.multi_model_comparison.consensus_score >= 80 ? '#00e5ff' : '#fbbf24' }]}>
+                      {simulation.multi_model_comparison.consensus_level?.toUpperCase()}
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.consensusProgressBarContainer}>
+                  <View style={[styles.consensusProgressBarFill, { 
+                    width: `${simulation.multi_model_comparison.consensus_score}%`,
+                    backgroundColor: simulation.multi_model_comparison.consensus_score >= 80 ? '#00e5ff' : '#fbbf24'
+                  }]} />
+                </View>
+              </View>
+
+              {/* Model Comparison Table */}
+              <View style={styles.comparisonTable}>
+                <View style={styles.tableHeaderRow}>
+                  <Text style={[styles.tableCellHeader, { flex: 1.5 }]}>MODEL</Text>
+                  <Text style={[styles.tableCellHeader, { flex: 1.2, textAlign: 'center' }]}>BIAS RATING</Text>
+                  <Text style={[styles.tableCellHeader, { flex: 1.2, textAlign: 'center' }]}>EMOTIONAL INT</Text>
+                  <Text style={[styles.tableCellHeader, { flex: 1.5, textAlign: 'right' }]}>PRIMARY EMOTION</Text>
+                </View>
+                {simulation.multi_model_comparison.details?.map((detail, idx) => (
+                  <View key={idx.toString()} style={styles.tableRow}>
+                    <Text style={[styles.tableCellModel, { flex: 1.5 }]}>◆ {detail.model.toUpperCase()}</Text>
+                    <Text style={[styles.tableCellVal, { flex: 1.2, textAlign: 'center', color: detail.bias_score > 50 ? '#ec4899' : '#00e5ff' }]}>{detail.bias_score}%</Text>
+                    <Text style={[styles.tableCellVal, { flex: 1.2, textAlign: 'center', color: detail.intensity_score > 50 ? '#ec4899' : '#00e5ff' }]}>{detail.intensity_score}%</Text>
+                    <Text style={[styles.tableCellEmotion, { flex: 1.5, textAlign: 'right' }]}>{detail.primary_emotion.toUpperCase()}</Text>
+                  </View>
+                ))}
+              </View>
+
+              {/* Dynamic Consensus Variances */}
+              {simulation.multi_model_comparison.variances?.length > 0 && (
+                <View style={styles.variancesBox}>
+                  <Text style={styles.variancesTitle}>CONSENSUS DEBATE NOTES & DEVIATIONS</Text>
+                  {simulation.multi_model_comparison.variances.map((variance, idx) => (
+                    <Text key={idx.toString()} style={styles.varianceText}>▪ {variance}</Text>
+                  ))}
+                </View>
+              )}
+            </Card>
+          </Animated.View>
+        )}
 
         {/* 60/40 ASYMMETRIC GRID WRAPPER */}
         <View style={styles.gridContainer}>
@@ -1510,5 +1587,178 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#F8FAFC',
     lineHeight: 16,
+  },
+  // Memory Recall Card Styles
+  memoryRecallCard: {
+    padding: SPACING.md,
+    borderColor: 'rgba(251, 191, 36, 0.35)',
+    backgroundColor: 'rgba(251, 191, 36, 0.03)',
+    borderRadius: BORDER_RADIUS.md,
+    borderWidth: 1.5,
+    marginBottom: SPACING.lg,
+  },
+  memoryRecallHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: SPACING.xs,
+  },
+  memoryRecallIcon: {
+    fontSize: 16,
+    marginRight: 8,
+  },
+  memoryRecallTitle: {
+    fontFamily: 'Orbitron',
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#fbbf24',
+    letterSpacing: 1,
+  },
+  memoryRecallText: {
+    fontFamily: 'IBM Plex Mono',
+    fontSize: 12,
+    color: '#94A3B8',
+    lineHeight: 18,
+    marginBottom: 6,
+  },
+  memoryRecallQuery: {
+    fontFamily: 'IBM Plex Mono',
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#F8FAFC',
+    lineHeight: 18,
+    fontStyle: 'italic',
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    padding: 8,
+    borderRadius: BORDER_RADIUS.sm,
+    marginBottom: 8,
+  },
+  memoryRecallMeta: {
+    fontFamily: 'IBM Plex Mono',
+    fontSize: 10,
+    color: '#fbbf24',
+    opacity: 0.85,
+  },
+  // Consensus Card Styles
+  consensusCard: {
+    padding: SPACING.md,
+    borderColor: 'rgba(0, 229, 255, 0.2)',
+    backgroundColor: 'rgba(3, 5, 13, 0.4)',
+    borderRadius: BORDER_RADIUS.md,
+    marginBottom: SPACING.lg,
+  },
+  consensusHeader: {
+    marginBottom: SPACING.md,
+  },
+  consensusMainRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    marginBottom: 6,
+  },
+  consensusScoreLabel: {
+    fontFamily: 'Orbitron',
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#94A3B8',
+    letterSpacing: 0.5,
+  },
+  consensusScoreValue: {
+    fontFamily: 'Orbitron',
+    fontSize: 14,
+    fontWeight: '900',
+    marginRight: 10,
+  },
+  consensusLevelBadge: {
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: BORDER_RADIUS.sm,
+  },
+  consensusLevelText: {
+    fontFamily: 'Orbitron',
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  consensusProgressBarContainer: {
+    height: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: BORDER_RADIUS.full,
+    overflow: 'hidden',
+    marginTop: 4,
+  },
+  consensusProgressBarFill: {
+    height: '100%',
+    borderRadius: BORDER_RADIUS.full,
+  },
+  comparisonTable: {
+    marginTop: SPACING.xs,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: BORDER_RADIUS.sm,
+    backgroundColor: 'rgba(0, 0, 0, 0.15)',
+    overflow: 'hidden',
+  },
+  tableHeaderRow: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+    paddingVertical: 8,
+    paddingHorizontal: SPACING.sm,
+  },
+  tableCellHeader: {
+    fontFamily: 'Orbitron',
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#587396',
+    letterSpacing: 0.5,
+  },
+  tableRow: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.04)',
+    paddingVertical: 8,
+    paddingHorizontal: SPACING.sm,
+    alignItems: 'center',
+  },
+  tableCellModel: {
+    fontFamily: 'Orbitron',
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#94A3B8',
+  },
+  tableCellVal: {
+    fontFamily: 'IBM Plex Mono',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  tableCellEmotion: {
+    fontFamily: 'Orbitron',
+    fontSize: 9,
+    color: '#94A3B8',
+  },
+  variancesBox: {
+    marginTop: SPACING.md,
+    backgroundColor: 'rgba(168, 85, 247, 0.03)',
+    borderColor: 'rgba(168, 85, 247, 0.15)',
+    borderWidth: 1,
+    borderRadius: BORDER_RADIUS.sm,
+    padding: SPACING.sm,
+  },
+  variancesTitle: {
+    fontFamily: 'Orbitron',
+    fontSize: 8,
+    fontWeight: '900',
+    color: '#a855f7',
+    letterSpacing: 1,
+    marginBottom: 6,
+  },
+  varianceText: {
+    fontFamily: 'IBM Plex Mono',
+    fontSize: 11,
+    color: '#94A3B8',
+    lineHeight: 16,
+    marginBottom: 4,
   },
 });

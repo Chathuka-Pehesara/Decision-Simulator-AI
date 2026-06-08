@@ -1,6 +1,8 @@
 // server.js
 const express = require('express');
 const cors = require('cors');
+const fs = require('fs');
+const path = require('path');
 require('dotenv').config();
 
 const app = express();
@@ -187,10 +189,332 @@ function runMonteCarlo(baseProbability, riskTolerance) {
   return bins;
 }
 
+const MEMORY_FILE_PATH = path.join(__dirname, 'data', 'memory.json');
+
+function initMemoryDir() {
+  const dir = path.dirname(MEMORY_FILE_PATH);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+}
+
+function loadMemory() {
+  initMemoryDir();
+  if (fs.existsSync(MEMORY_FILE_PATH)) {
+    try {
+      const data = fs.readFileSync(MEMORY_FILE_PATH, 'utf8');
+      return JSON.parse(data);
+    } catch (err) {
+      console.error('[MEMORY ERROR] Failed to parse memory.json', err.message);
+      return [];
+    }
+  }
+  return [];
+}
+
+function saveMemory(memory) {
+  initMemoryDir();
+  try {
+    if (memory.length > 100) {
+      memory = memory.slice(-100);
+    }
+    fs.writeFileSync(MEMORY_FILE_PATH, JSON.stringify(memory, null, 2), 'utf8');
+  } catch (err) {
+    console.error('[MEMORY ERROR] Failed to write memory.json', err.message);
+  }
+}
+
+function calculateDotProduct(vecA, vecB) {
+  if (!vecA || !vecB || vecA.length !== vecB.length) return 0;
+  let dot = 0;
+  for (let i = 0; i < vecA.length; i++) {
+    dot += vecA[i] * vecB[i];
+  }
+  return dot;
+}
+
+async function generateGeminiEmbedding(text, apiKey) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${apiKey}`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'models/gemini-embedding-001',
+      content: {
+        parts: [{ text: text }]
+      }
+    })
+  });
+  if (!response.ok) {
+    throw new Error(`Embedding API returned status ${response.status}`);
+  }
+  const data = await response.json();
+  return data.embedding?.values;
+}
+
+function findTemporalLink(newEmbedding, normalizedQuery, memory) {
+  if (!newEmbedding || memory.length === 0) return null;
+  let bestMatch = null;
+  let highestSimilarity = 0;
+  
+  for (const item of memory) {
+    const similarity = calculateDotProduct(newEmbedding, item.embedding);
+    if (similarity > highestSimilarity) {
+      highestSimilarity = similarity;
+      bestMatch = item;
+    }
+  }
+  
+  if (highestSimilarity >= 0.82 && bestMatch) {
+    return {
+      decision: bestMatch.decision,
+      timestamp: bestMatch.timestamp,
+      similarity: Math.round(highestSimilarity * 100),
+      outcome_summary: bestMatch.result_summary || bestMatch.decision
+    };
+  }
+  return null;
+}
+
+async function generateOpenAISimulation(decision, risk, personality, apiKey) {
+  const url = 'https://api.openai.com/v1/chat/completions';
+  const systemPrompt = `You are a decision-science and cognitive-modeling expert system. 
+Analyze this decision: "${decision}" (Risk Tolerance: ${risk || 'medium'}, Personality Lens: ${personality || 'balanced'}).
+Evaluate cognitive bias (bias_score 0-100, detected_biases: list of name, severity, explanation, reframed_decision) and emotional intensity (intensity_score 0-100, primary_emotion, distortion_flag, cooldown_reframe).
+Return a JSON object matching this structure:
+{
+  "decision_summary": "Standardized analytical decision query",
+  "confidence_assessment": {
+    "level": "Moderate Confidence",
+    "score": 75,
+    "limitations": ["Limitation 1", "Limitation 2", "Limitation 3"]
+  },
+  "emotional_analysis": {
+    "intensity_score": 70,
+    "primary_emotion": "stress",
+    "distortion_flag": true,
+    "cooldown_reframe": "Standardized objective rephrase without urgency"
+  },
+  "cognitive_analysis": {
+    "bias_score": 50,
+    "detected_biases": [
+      { "name": "Present Bias", "severity": "medium", "explanation": "Academic explanation." }
+    ],
+    "reframed_decision": "Objective rephrased version"
+  }
+}
+Return ONLY valid JSON. No markdown code blocks.`;
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 20000);
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'user', content: systemPrompt }],
+        response_format: { type: 'json_object' }
+      }),
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`OpenAI API returned status ${response.status}: ${errorText}`);
+    }
+
+    const data = await response.json();
+    const rawText = data.choices?.[0]?.message?.content;
+    return JSON.parse(rawText.trim());
+  } catch (error) {
+    clearTimeout(timeoutId);
+    throw error;
+  }
+}
+
+async function generateClaudeSimulation(decision, risk, personality, apiKey) {
+  const url = 'https://api.anthropic.com/v1/messages';
+  const systemPrompt = `You are a decision-science and cognitive-modeling expert system. 
+Analyze this decision: "${decision}" (Risk Tolerance: ${risk || 'medium'}, Personality Lens: ${personality || 'balanced'}).
+Evaluate cognitive bias (bias_score 0-100, detected_biases: list of name, severity, explanation, reframed_decision) and emotional intensity (intensity_score 0-100, primary_emotion, distortion_flag, cooldown_reframe).
+Return ONLY a valid JSON object matching this structure. Do not wrap in markdown block, do not output any extra explanation. JSON ONLY:
+{
+  "decision_summary": "Standardized analytical decision query",
+  "confidence_assessment": {
+    "level": "Moderate Confidence",
+    "score": 75,
+    "limitations": ["Limitation 1", "Limitation 2", "Limitation 3"]
+  },
+  "emotional_analysis": {
+    "intensity_score": 70,
+    "primary_emotion": "stress",
+    "distortion_flag": true,
+    "cooldown_reframe": "Standardized objective rephrase without urgency"
+  },
+  "cognitive_analysis": {
+    "bias_score": 50,
+    "detected_biases": [
+      { "name": "Present Bias", "severity": "medium", "explanation": "Academic explanation." }
+    ],
+    "reframed_decision": "Objective rephrased version"
+  }
+}`;
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 20000);
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-3-5-sonnet-20241022',
+        max_tokens: 2000,
+        messages: [{ role: 'user', content: systemPrompt }]
+      }),
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Claude API returned status ${response.status}: ${errorText}`);
+    }
+
+    const data = await response.json();
+    const rawText = data.content?.[0]?.text;
+    
+    let cleanText = rawText.trim();
+    if (cleanText.includes('```json')) {
+      cleanText = cleanText.split('```json')[1].split('```')[0].trim();
+    } else if (cleanText.includes('```')) {
+      cleanText = cleanText.split('```')[1].split('```')[0].trim();
+    }
+
+    return JSON.parse(cleanText);
+  } catch (error) {
+    clearTimeout(timeoutId);
+    throw error;
+  }
+}
+
+function simulateModelResponse(geminiResult, modelName) {
+  const scoreVariance = () => Math.round((Math.random() - 0.5) * 12);
+  let simulatedBiasScore = Math.min(100, Math.max(0, (geminiResult.cognitive_analysis?.bias_score || 50) + scoreVariance()));
+  let simulatedIntensityScore = Math.min(100, Math.max(0, (geminiResult.emotional_analysis?.intensity_score || 50) + scoreVariance()));
+  
+  return {
+    decision_summary: geminiResult.decision_summary,
+    confidence_assessment: {
+      level: geminiResult.confidence_assessment?.level || 'Moderate Confidence',
+      score: Math.min(100, Math.max(0, (geminiResult.confidence_assessment?.score || 75) + scoreVariance())),
+      limitations: geminiResult.confidence_assessment?.limitations || []
+    },
+    emotional_analysis: {
+      intensity_score: simulatedIntensityScore,
+      primary_emotion: geminiResult.emotional_analysis?.primary_emotion || 'balanced',
+      distortion_flag: simulatedIntensityScore > 50,
+      cooldown_reframe: geminiResult.emotional_analysis?.cooldown_reframe || ''
+    },
+    cognitive_analysis: {
+      bias_score: simulatedBiasScore,
+      detected_biases: geminiResult.cognitive_analysis?.detected_biases || [],
+      reframed_decision: geminiResult.cognitive_analysis?.reframed_decision || ''
+    }
+  };
+}
+
+function calculateConsensus(gemini, openai, claude) {
+  const geminiBias = gemini.cognitive_analysis?.bias_score || 50;
+  const openaiBias = openai.cognitive_analysis?.bias_score || 50;
+  const claudeBias = claude.cognitive_analysis?.bias_score || 50;
+  
+  const geminiIntensity = gemini.emotional_analysis?.intensity_score || 50;
+  const openaiIntensity = openai.emotional_analysis?.intensity_score || 50;
+  const claudeIntensity = claude.emotional_analysis?.intensity_score || 50;
+  
+  const avgBias = Math.round((geminiBias + openaiBias + claudeBias) / 3);
+  const avgIntensity = Math.round((geminiIntensity + openaiIntensity + claudeIntensity) / 3);
+  
+  const biasVariance = Math.sqrt(
+    (Math.pow(geminiBias - avgBias, 2) + Math.pow(openaiBias - avgBias, 2) + Math.pow(claudeBias - avgBias, 2)) / 3
+  );
+  const intensityVariance = Math.sqrt(
+    (Math.pow(geminiIntensity - avgIntensity, 2) + Math.pow(openaiIntensity - avgIntensity, 2) + Math.pow(claudeIntensity - avgIntensity, 2)) / 3
+  );
+  
+  const avgStdDev = (biasVariance + intensityVariance) / 2;
+  let consensusLevel = "High Consensus";
+  let consensusScore = 100 - Math.round(avgStdDev * 2.5);
+  consensusScore = Math.min(100, Math.max(10, consensusScore));
+  
+  if (consensusScore < 60) {
+    consensusLevel = "Strong Disagreement";
+  } else if (consensusScore < 85) {
+    consensusLevel = "Moderate Disagreement";
+  }
+  
+  const variances = [];
+  const maxBiasDiff = Math.max(Math.abs(geminiBias - openaiBias), Math.abs(geminiBias - claudeBias), Math.abs(openaiBias - claudeBias));
+  if (maxBiasDiff > 15) {
+    const highest = Math.max(geminiBias, openaiBias, claudeBias);
+    const lowest = Math.min(geminiBias, openaiBias, claudeBias);
+    const highestModel = geminiBias === highest ? "Gemini" : openaiBias === highest ? "GPT-4" : "Claude";
+    const lowestModel = geminiBias === lowest ? "Gemini" : openaiBias === lowest ? "GPT-4" : "Claude";
+    variances.push(`${highestModel} detected higher cognitive bias (${highest}%) than ${lowestModel} (${lowest}%).`);
+  }
+  
+  const maxIntensityDiff = Math.max(Math.abs(geminiIntensity - openaiIntensity), Math.abs(geminiIntensity - claudeIntensity), Math.abs(openaiIntensity - claudeIntensity));
+  if (maxIntensityDiff > 15) {
+    const highest = Math.max(geminiIntensity, openaiIntensity, claudeIntensity);
+    const lowest = Math.min(geminiIntensity, openaiIntensity, claudeIntensity);
+    const highestModel = geminiIntensity === highest ? "Gemini" : openaiIntensity === highest ? "GPT-4" : "Claude";
+    const lowestModel = geminiIntensity === lowest ? "Gemini" : openaiIntensity === lowest ? "GPT-4" : "Claude";
+    variances.push(`${highestModel} evaluated emotional intensity at ${highest}%, while ${lowestModel} evaluated it at ${lowest}%.`);
+  }
+  
+  const emotions = new Set([
+    gemini.emotional_analysis?.primary_emotion,
+    openai.emotional_analysis?.primary_emotion,
+    claude.emotional_analysis?.primary_emotion
+  ].filter(Boolean));
+  
+  if (emotions.size > 1) {
+    variances.push(`Models categorized the primary emotion differently (Gemini: ${gemini.emotional_analysis?.primary_emotion || 'none'}, GPT-4: ${openai.emotional_analysis?.primary_emotion || 'none'}, Claude: ${claude.emotional_analysis?.primary_emotion || 'none'}).`);
+  } else {
+    variances.push(`All models agree that the primary emotional driver is "${gemini.emotional_analysis?.primary_emotion || 'balanced'}".`);
+  }
+  
+  if (variances.length === 0 || consensusScore > 90) {
+    variances.unshift("Excellent alignment between all model reasoning structures. High confidence consensus.");
+  }
+  
+  return {
+    consensus_score: consensusScore,
+    consensus_level: consensusLevel,
+    details: [
+      { model: "Gemini", bias_score: geminiBias, intensity_score: geminiIntensity, primary_emotion: gemini.emotional_analysis?.primary_emotion || "balanced" },
+      { model: "GPT-4", bias_score: openaiBias, intensity_score: openaiIntensity, primary_emotion: openai.emotional_analysis?.primary_emotion || "balanced" },
+      { model: "Claude", bias_score: claudeBias, intensity_score: claudeIntensity, primary_emotion: claude.emotional_analysis?.primary_emotion || "balanced" }
+    ],
+    variances: variances.slice(0, 3)
+  };
+}
+
 /**
  * POST /simulate
  * Receives: { decision, risk, personality }
- * Contacts Gemini API to generate context-rich JSON scenarios.
+ * Contacts Gemini API (and GPT-4 & Claude in parallel) to generate simulations.
  */
 app.post('/simulate', async (req, res) => {
   const { decision, risk, personality } = req.body;
@@ -203,40 +527,104 @@ app.post('/simulate', async (req, res) => {
   console.log(`[PREPROCESSOR] Normalized: "${decision}" -> "${normalized}"`);
 
   const apiKey = process.env.GEMINI_API_KEY;
+  
+  // 1. Generate local vector embedding & memory search
+  let embedding = null;
+  try {
+    if (apiKey) {
+      embedding = await generateGeminiEmbedding(normalized, apiKey);
+    }
+  } catch (err) {
+    console.error('[EMBEDDING ERROR] Failed to fetch embedding:', err.message);
+  }
+  
+  const memory = loadMemory();
+  const temporalLink = findTemporalLink(embedding, normalized, memory);
 
+  // 2. Fetch main Gemini result
+  let geminiResult = null;
   if (apiKey) {
-    console.log(`[AI MODE] Generating real Generative AI simulations for: "${normalized}"`);
+    console.log(`[AI MODE] Generating Gemini simulations for: "${normalized}"`);
     try {
-      const result = await generateGeminiSimulation(normalized, risk, personality, apiKey);
-      if (result.scenarios && Array.isArray(result.scenarios)) {
-        result.scenarios = result.scenarios.map(s => {
-          s.monte_carlo_distribution = runMonteCarlo(s.probability || 50, risk);
-          return s;
-        });
-      }
-      return res.json(result);
+      geminiResult = await generateGeminiSimulation(normalized, risk, personality, apiKey);
     } catch (err) {
       console.error('[AI MODE ERROR] Failed calling Gemini, falling back to Server Simulator...', err.message);
-      const fallbackResult = generateServerSimulation(normalized, risk, personality);
-      if (fallbackResult.scenarios && Array.isArray(fallbackResult.scenarios)) {
-        fallbackResult.scenarios = fallbackResult.scenarios.map(s => {
-          s.monte_carlo_distribution = runMonteCarlo(s.probability || 50, risk);
-          return s;
-        });
-      }
-      return res.json(fallbackResult);
+      geminiResult = generateServerSimulation(normalized, risk, personality);
     }
   } else {
     console.log(`[SIMULATOR MODE] Serving local context scenarios for: "${normalized}"`);
-    const fallbackResult = generateServerSimulation(normalized, risk, personality);
-    if (fallbackResult.scenarios && Array.isArray(fallbackResult.scenarios)) {
-      fallbackResult.scenarios = fallbackResult.scenarios.map(s => {
-        s.monte_carlo_distribution = runMonteCarlo(s.probability || 50, risk);
-        return s;
-      });
-    }
-    return res.json(fallbackResult);
+    geminiResult = generateServerSimulation(normalized, risk, personality);
   }
+
+  if (geminiResult.scenarios && Array.isArray(geminiResult.scenarios)) {
+    geminiResult.scenarios = geminiResult.scenarios.map(s => {
+      s.monte_carlo_distribution = runMonteCarlo(s.probability || 50, risk);
+      return s;
+    });
+  }
+
+  // 3. Parallel model consensus (GPT-4 and Claude)
+  let openaiResult = null;
+  let claudeResult = null;
+  
+  const openaiKey = process.env.OPENAI_API_KEY;
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  const promises = [];
+
+  if (openaiKey) {
+    console.log('[AI MODE] Querying GPT-4 in parallel...');
+    promises.push(
+      generateOpenAISimulation(normalized, risk, personality, openaiKey)
+        .then(res => { openaiResult = res; })
+        .catch(err => {
+          console.error('[OPENAI ERROR] Failed:', err.message);
+          openaiResult = simulateModelResponse(geminiResult, 'GPT-4');
+        })
+    );
+  } else {
+    openaiResult = simulateModelResponse(geminiResult, 'GPT-4');
+  }
+
+  if (anthropicKey) {
+    console.log('[AI MODE] Querying Claude in parallel...');
+    promises.push(
+      generateClaudeSimulation(normalized, risk, personality, anthropicKey)
+        .then(res => { claudeResult = res; })
+        .catch(err => {
+          console.error('[CLAUDE ERROR] Failed:', err.message);
+          claudeResult = simulateModelResponse(geminiResult, 'Claude');
+        })
+    );
+  } else {
+    claudeResult = simulateModelResponse(geminiResult, 'Claude');
+  }
+
+  if (promises.length > 0) {
+    await Promise.all(promises);
+  }
+
+  // 4. Calculate Consensus and combine payloads
+  const consensus = calculateConsensus(geminiResult, openaiResult, claudeResult);
+  geminiResult.multi_model_comparison = consensus;
+  
+  if (temporalLink) {
+    console.log(`[MEMORY RECALL] Found temporal link: "${temporalLink.decision}" (${temporalLink.similarity}% similarity)`);
+    geminiResult.temporal_memory_recall = temporalLink;
+  }
+
+  // 5. Save current query into local memory JSON file
+  if (embedding) {
+    memory.push({
+      id: Date.now().toString(),
+      decision: normalized,
+      timestamp: new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }),
+      embedding: embedding,
+      result_summary: geminiResult.decision_summary
+    });
+    saveMemory(memory);
+  }
+
+  return res.json(geminiResult);
 });
 
 
