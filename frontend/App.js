@@ -1,9 +1,12 @@
 // App.js
 import React, { useEffect } from 'react';
-import { Platform } from 'react-native';
+import { Platform, View, ActivityIndicator } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { useFonts } from 'expo-font';
+import { Orbitron_700Bold } from '@expo-google-fonts/orbitron';
+import { IBMPlexMono_400Regular } from '@expo-google-fonts/ibm-plex-mono';
 
 // Screens
 import HomeScreen from './src/screens/HomeScreen';
@@ -17,6 +20,11 @@ import { COLORS } from './src/styles/theme';
 const Stack = createNativeStackNavigator();
 
 export default function App() {
+  const [fontsLoaded] = useFonts({
+    'Orbitron': Orbitron_700Bold,
+    'IBM Plex Mono': IBMPlexMono_400Regular,
+  });
+
   useEffect(() => {
     if (Platform.OS === 'web') {
       // 1. Inject Sci-Fi Google Fonts Link
@@ -171,6 +179,14 @@ export default function App() {
       document.body.classList.add('radar-active');
     }
   }, []);
+
+  if (!fontsLoaded) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#03050d', justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#00e5ff" />
+      </View>
+    );
+  }
 
   return (
     <NavigationContainer>

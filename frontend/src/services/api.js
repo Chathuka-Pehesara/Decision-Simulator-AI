@@ -1,8 +1,26 @@
 // src/services/api.js
 import axios from 'axios';
+import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 
-// The default backend URL as specified in requirements
-const API_URL = 'http://localhost:3000/simulate';
+// Dynamically resolve machine IP for mobile testing, fallback to localhost for web
+const getBackendUrl = () => {
+  if (Platform.OS === 'web') {
+    return 'http://localhost:3000/simulate';
+  }
+  const hostUri = Constants.expoConfig?.hostUri;
+  if (hostUri) {
+    const hostname = hostUri.split(':')[0];
+    const isIp = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/.test(hostname);
+    if (isIp) {
+      return `http://${hostname}:3000/simulate`;
+    }
+  }
+  // Fallback to the discovered local Wi-Fi IP address of the development machine
+  return 'http://10.188.179.4:3000/simulate';
+};
+
+const API_URL = getBackendUrl();
 
 const api = axios.create({
   timeout: 50000,
