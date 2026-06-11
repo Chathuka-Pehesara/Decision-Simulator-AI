@@ -10,7 +10,7 @@ const PORT = process.env.PORT || 3000;
 
 // Enable CORS so your phone or browser can communicate with the server
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 // Logging middleware
 app.use((req, res, next) => {
@@ -276,8 +276,141 @@ function findTemporalLink(newEmbedding, normalizedQuery, memory) {
   return null;
 }
 
-async function generateOpenAISimulation(decision, risk, personality, apiKey) {
-  const url = 'https://api.openai.com/v1/chat/completions';
+function resolveModelConfig(modelString) {
+  if (!modelString || !modelString.includes('/')) {
+    return { provider: 'gemini', model: 'gemini-2.5-flash' };
+  }
+  const parts = modelString.split('/');
+  const provider = parts[0].toLowerCase();
+  const model = parts.slice(1).join('/');
+  return { provider, model };
+}
+
+function getApiKeyForProvider(provider) {
+  if (provider === 'gemini') return process.env.GEMINI_API_KEY;
+  if (provider === 'groq') return process.env.GROQ_API_KEY;
+  if (provider === 'openrouter') return process.env.OPENROUTER_API_KEY;
+  if (provider === 'openai') return process.env.OPENAI_API_KEY;
+  if (provider === 'anthropic' || provider === 'claude') return process.env.ANTHROPIC_API_KEY;
+  return null;
+}
+
+function isKeyConfigured(key) {
+  return key && key.trim() !== '' && !key.toLowerCase().includes('here') && !key.toLowerCase().includes('placeholder') && !key.toLowerCase().includes('your_');
+}
+
+function getModelDisplayName(modelString) {
+  if (!modelString) return 'Unknown';
+  if (modelString.includes('/')) {
+    const parts = modelString.split('/');
+    const provider = parts[0].toUpperCase();
+    const model = parts.slice(1).join('/');
+    
+    if (model.includes('llama-3.3-70b')) return 'Llama 3.3 (Groq)';
+    if (model.includes('llama-3-8b')) return 'Llama 3 (OpenRouter)';
+    if (model.includes('gemma-2-9b')) return 'Gemma 2 (OpenRouter)';
+    if (model.includes('gemini-2.5-flash')) return 'Gemini 2.5 Flash';
+    if (model.includes('gpt-4o-mini')) return 'GPT-4o Mini';
+    if (model.includes('claude-3-5-sonnet')) return 'Claude 3.5 Sonnet';
+    
+    return `${model} (${provider})`;
+  }
+  return modelString;
+}
+
+async function callLLM(provider, model, apiKey, prompt, useJsonMode = true) {
+  let url = '';
+  const headers = { 'Content-Type': 'application/json' };
+  let body = {};
+  
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 45000);
+
+  try {
+    if (provider === 'gemini') {
+      url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      const genConfig = useJsonMode ? { responseMimeType: 'application/json' } : {};
+      body = {
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: genConfig
+      };
+    } else if (provider === 'anthropic' || provider === 'claude') {
+      url = 'https://api.anthropic.com/v1/messages';
+      headers['x-api-key'] = apiKey;
+      headers['anthropic-version'] = '2023-06-01';
+      body = {
+        model: model,
+        max_tokens: 2000,
+        messages: [{ role: 'user', content: prompt }]
+      };
+    } else {
+      // openai, groq, openrouter
+      if (provider === 'openai') {
+        url = 'https://api.openai.com/v1/chat/completions';
+        headers['Authorization'] = `Bearer ${apiKey}`;
+      } else if (provider === 'groq') {
+        url = 'https://api.groq.com/openai/v1/chat/completions';
+        headers['Authorization'] = `Bearer ${apiKey}`;
+      } else if (provider === 'openrouter') {
+        url = 'https://openrouter.ai/api/v1/chat/completions';
+        headers['Authorization'] = `Bearer ${apiKey}`;
+        headers['HTTP-Referer'] = 'https://github.com/Chathuka-Pehesara/Decision-Simulator-AI';
+        headers['X-Title'] = 'Decision Simulator AI';
+      }
+      
+      body = {
+        model: model,
+        messages: [{ role: 'user', content: prompt }]
+      };
+      if (useJsonMode) {
+        body.response_format = { type: 'json_object' };
+      }
+    }
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify(body),
+      signal: controller.signal
+    });
+    
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`${provider.toUpperCase()} API returned status ${response.status}: ${errorText}`);
+    }
+
+    const data = await response.json();
+    
+    let rawText = '';
+    if (provider === 'gemini') {
+      rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    } else if (provider === 'anthropic' || provider === 'claude') {
+      rawText = data.content?.[0]?.text;
+    } else {
+      rawText = data.choices?.[0]?.message?.content;
+    }
+
+    if (!rawText) {
+      throw new Error(`${provider.toUpperCase()} response was empty.`);
+    }
+
+    let cleanText = rawText.trim();
+    if (cleanText.includes('```json')) {
+      cleanText = cleanText.split('```json')[1].split('```')[0].trim();
+    } else if (cleanText.includes('```')) {
+      cleanText = cleanText.split('```')[1].split('```')[0].trim();
+    }
+
+    return JSON.parse(cleanText);
+  } catch (error) {
+    clearTimeout(timeoutId);
+    throw error;
+  }
+}
+
+async function generateModelSimulation(decision, risk, personality, provider, model, apiKey) {
   const systemPrompt = `You are a decision-science and cognitive-modeling expert system. 
 Analyze this decision: "${decision}" (Risk Tolerance: ${risk || 'medium'}, Personality Lens: ${personality || 'balanced'}).
 Evaluate cognitive bias (bias_score 0-100, detected_biases: list of name, severity, explanation, reframed_decision) and emotional intensity (intensity_score 0-100, primary_emotion, distortion_flag, cooldown_reframe).
@@ -303,109 +436,9 @@ Return a JSON object matching this structure:
     "reframed_decision": "Objective rephrased version"
   }
 }
-Return ONLY valid JSON. No markdown code blocks.`;
+Return ONLY valid JSON. Do not wrap in markdown block. JSON ONLY.`;
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 20000);
-
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [{ role: 'user', content: systemPrompt }],
-        response_format: { type: 'json_object' }
-      }),
-      signal: controller.signal
-    });
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`OpenAI API returned status ${response.status}: ${errorText}`);
-    }
-
-    const data = await response.json();
-    const rawText = data.choices?.[0]?.message?.content;
-    return JSON.parse(rawText.trim());
-  } catch (error) {
-    clearTimeout(timeoutId);
-    throw error;
-  }
-}
-
-async function generateClaudeSimulation(decision, risk, personality, apiKey) {
-  const url = 'https://api.anthropic.com/v1/messages';
-  const systemPrompt = `You are a decision-science and cognitive-modeling expert system. 
-Analyze this decision: "${decision}" (Risk Tolerance: ${risk || 'medium'}, Personality Lens: ${personality || 'balanced'}).
-Evaluate cognitive bias (bias_score 0-100, detected_biases: list of name, severity, explanation, reframed_decision) and emotional intensity (intensity_score 0-100, primary_emotion, distortion_flag, cooldown_reframe).
-Return ONLY a valid JSON object matching this structure. Do not wrap in markdown block, do not output any extra explanation. JSON ONLY:
-{
-  "decision_summary": "Standardized analytical decision query",
-  "confidence_assessment": {
-    "level": "Moderate Confidence",
-    "score": 75,
-    "limitations": ["Limitation 1", "Limitation 2", "Limitation 3"]
-  },
-  "emotional_analysis": {
-    "intensity_score": 70,
-    "primary_emotion": "stress",
-    "distortion_flag": true,
-    "cooldown_reframe": "Standardized objective rephrase without urgency"
-  },
-  "cognitive_analysis": {
-    "bias_score": 50,
-    "detected_biases": [
-      { "name": "Present Bias", "severity": "medium", "explanation": "Academic explanation." }
-    ],
-    "reframed_decision": "Objective rephrased version"
-  }
-}`;
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 20000);
-
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: 'claude-3-5-sonnet-20241022',
-        max_tokens: 2000,
-        messages: [{ role: 'user', content: systemPrompt }]
-      }),
-      signal: controller.signal
-    });
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Claude API returned status ${response.status}: ${errorText}`);
-    }
-
-    const data = await response.json();
-    const rawText = data.content?.[0]?.text;
-    
-    let cleanText = rawText.trim();
-    if (cleanText.includes('```json')) {
-      cleanText = cleanText.split('```json')[1].split('```')[0].trim();
-    } else if (cleanText.includes('```')) {
-      cleanText = cleanText.split('```')[1].split('```')[0].trim();
-    }
-
-    return JSON.parse(cleanText);
-  } catch (error) {
-    clearTimeout(timeoutId);
-    throw error;
-  }
+  return await callLLM(provider, model, apiKey, systemPrompt, true);
 }
 
 function simulateModelResponse(geminiResult, modelName) {
@@ -434,23 +467,23 @@ function simulateModelResponse(geminiResult, modelName) {
   };
 }
 
-function calculateConsensus(gemini, openai, claude) {
-  const geminiBias = gemini.cognitive_analysis?.bias_score || 50;
-  const openaiBias = openai.cognitive_analysis?.bias_score || 50;
-  const claudeBias = claude.cognitive_analysis?.bias_score || 50;
+function calculateConsensus(model1Result, model2Result, model3Result, name1, name2, name3) {
+  const bias1 = model1Result.cognitive_analysis?.bias_score || 50;
+  const bias2 = model2Result.cognitive_analysis?.bias_score || 50;
+  const bias3 = model3Result.cognitive_analysis?.bias_score || 50;
   
-  const geminiIntensity = gemini.emotional_analysis?.intensity_score || 50;
-  const openaiIntensity = openai.emotional_analysis?.intensity_score || 50;
-  const claudeIntensity = claude.emotional_analysis?.intensity_score || 50;
+  const intensity1 = model1Result.emotional_analysis?.intensity_score || 50;
+  const intensity2 = model2Result.emotional_analysis?.intensity_score || 50;
+  const intensity3 = model3Result.emotional_analysis?.intensity_score || 50;
   
-  const avgBias = Math.round((geminiBias + openaiBias + claudeBias) / 3);
-  const avgIntensity = Math.round((geminiIntensity + openaiIntensity + claudeIntensity) / 3);
+  const avgBias = Math.round((bias1 + bias2 + bias3) / 3);
+  const avgIntensity = Math.round((intensity1 + intensity2 + intensity3) / 3);
   
   const biasVariance = Math.sqrt(
-    (Math.pow(geminiBias - avgBias, 2) + Math.pow(openaiBias - avgBias, 2) + Math.pow(claudeBias - avgBias, 2)) / 3
+    (Math.pow(bias1 - avgBias, 2) + Math.pow(bias2 - avgBias, 2) + Math.pow(bias3 - avgBias, 2)) / 3
   );
   const intensityVariance = Math.sqrt(
-    (Math.pow(geminiIntensity - avgIntensity, 2) + Math.pow(openaiIntensity - avgIntensity, 2) + Math.pow(claudeIntensity - avgIntensity, 2)) / 3
+    (Math.pow(intensity1 - avgIntensity, 2) + Math.pow(intensity2 - avgIntensity, 2) + Math.pow(intensity3 - avgIntensity, 2)) / 3
   );
   
   const avgStdDev = (biasVariance + intensityVariance) / 2;
@@ -465,34 +498,34 @@ function calculateConsensus(gemini, openai, claude) {
   }
   
   const variances = [];
-  const maxBiasDiff = Math.max(Math.abs(geminiBias - openaiBias), Math.abs(geminiBias - claudeBias), Math.abs(openaiBias - claudeBias));
+  const maxBiasDiff = Math.max(Math.abs(bias1 - bias2), Math.abs(bias1 - bias3), Math.abs(bias2 - bias3));
   if (maxBiasDiff > 15) {
-    const highest = Math.max(geminiBias, openaiBias, claudeBias);
-    const lowest = Math.min(geminiBias, openaiBias, claudeBias);
-    const highestModel = geminiBias === highest ? "Gemini" : openaiBias === highest ? "GPT-4" : "Claude";
-    const lowestModel = geminiBias === lowest ? "Gemini" : openaiBias === lowest ? "GPT-4" : "Claude";
+    const highest = Math.max(bias1, bias2, bias3);
+    const lowest = Math.min(bias1, bias2, bias3);
+    const highestModel = bias1 === highest ? name1 : bias2 === highest ? name2 : name3;
+    const lowestModel = bias1 === lowest ? name1 : bias2 === lowest ? name2 : name3;
     variances.push(`${highestModel} detected higher cognitive bias (${highest}%) than ${lowestModel} (${lowest}%).`);
   }
   
-  const maxIntensityDiff = Math.max(Math.abs(geminiIntensity - openaiIntensity), Math.abs(geminiIntensity - claudeIntensity), Math.abs(openaiIntensity - claudeIntensity));
+  const maxIntensityDiff = Math.max(Math.abs(intensity1 - intensity2), Math.abs(intensity1 - intensity3), Math.abs(intensity2 - intensity3));
   if (maxIntensityDiff > 15) {
-    const highest = Math.max(geminiIntensity, openaiIntensity, claudeIntensity);
-    const lowest = Math.min(geminiIntensity, openaiIntensity, claudeIntensity);
-    const highestModel = geminiIntensity === highest ? "Gemini" : openaiIntensity === highest ? "GPT-4" : "Claude";
-    const lowestModel = geminiIntensity === lowest ? "Gemini" : openaiIntensity === lowest ? "GPT-4" : "Claude";
+    const highest = Math.max(intensity1, intensity2, intensity3);
+    const lowest = Math.min(intensity1, intensity2, intensity3);
+    const highestModel = intensity1 === highest ? name1 : intensity2 === highest ? name2 : name3;
+    const lowestModel = intensity1 === lowest ? name1 : intensity2 === lowest ? name2 : name3;
     variances.push(`${highestModel} evaluated emotional intensity at ${highest}%, while ${lowestModel} evaluated it at ${lowest}%.`);
   }
   
   const emotions = new Set([
-    gemini.emotional_analysis?.primary_emotion,
-    openai.emotional_analysis?.primary_emotion,
-    claude.emotional_analysis?.primary_emotion
+    model1Result.emotional_analysis?.primary_emotion,
+    model2Result.emotional_analysis?.primary_emotion,
+    model3Result.emotional_analysis?.primary_emotion
   ].filter(Boolean));
   
   if (emotions.size > 1) {
-    variances.push(`Models categorized the primary emotion differently (Gemini: ${gemini.emotional_analysis?.primary_emotion || 'none'}, GPT-4: ${openai.emotional_analysis?.primary_emotion || 'none'}, Claude: ${claude.emotional_analysis?.primary_emotion || 'none'}).`);
+    variances.push(`Models categorized the primary emotion differently (${name1}: ${model1Result.emotional_analysis?.primary_emotion || 'none'}, ${name2}: ${model2Result.emotional_analysis?.primary_emotion || 'none'}, ${name3}: ${model3Result.emotional_analysis?.primary_emotion || 'none'}).`);
   } else {
-    variances.push(`All models agree that the primary emotional driver is "${gemini.emotional_analysis?.primary_emotion || 'balanced'}".`);
+    variances.push(`All models agree that the primary emotional driver is "${model1Result.emotional_analysis?.primary_emotion || 'balanced'}".`);
   }
   
   if (variances.length === 0 || consensusScore > 90) {
@@ -503,12 +536,100 @@ function calculateConsensus(gemini, openai, claude) {
     consensus_score: consensusScore,
     consensus_level: consensusLevel,
     details: [
-      { model: "Gemini", bias_score: geminiBias, intensity_score: geminiIntensity, primary_emotion: gemini.emotional_analysis?.primary_emotion || "balanced" },
-      { model: "GPT-4", bias_score: openaiBias, intensity_score: openaiIntensity, primary_emotion: openai.emotional_analysis?.primary_emotion || "balanced" },
-      { model: "Claude", bias_score: claudeBias, intensity_score: claudeIntensity, primary_emotion: claude.emotional_analysis?.primary_emotion || "balanced" }
+      { model: name1, bias_score: bias1, intensity_score: intensity1, primary_emotion: model1Result.emotional_analysis?.primary_emotion || "balanced" },
+      { model: name2, bias_score: bias2, intensity_score: intensity2, primary_emotion: model2Result.emotional_analysis?.primary_emotion || "balanced" },
+      { model: name3, bias_score: bias3, intensity_score: intensity3, primary_emotion: model3Result.emotional_analysis?.primary_emotion || "balanced" }
     ],
     variances: variances.slice(0, 3)
   };
+}
+
+/**
+ * Programmatic mapper to enrich scenarios with 1 / 3 / 5 / 10 year temporal outcomes
+ * and a branching consequence tree. This acts as a fallback and normalization layer.
+ */
+function ensureTemporalAndTree(scenarios, risk, personality) {
+  if (!scenarios || !Array.isArray(scenarios)) return [];
+  return scenarios.map(s => {
+    // 1. Ensure temporal_outcomes
+    if (!s.temporal_outcomes || typeof s.temporal_outcomes !== 'object') {
+      const baseProb = s.probability || 50;
+      const baseRisk = s.risk_level || 'medium';
+      const baseEmotion = s.emotional_impact || 'Measured';
+      const baseDesc = s.description || 'Proceed with the action.';
+      
+      const r = risk || 'medium';
+      const p = personality || 'balanced';
+      
+      const riskVal = baseRisk === 'high' ? 80 : baseRisk === 'medium' ? 50 : 25;
+      const rewardVal = p === 'risk-taker' ? 85 : 60;
+      
+      s.temporal_outcomes = {
+        "1": {
+          description: `Year 1: ${baseDesc}`,
+          probability: baseProb,
+          risk_level: baseRisk,
+          emotional_impact: baseEmotion,
+          radar_metrics: { risk: riskVal, reward: rewardVal, time_cost: 40, emotional_toll: baseRisk === 'high' ? 70 : 40, reversibility: baseRisk === 'high' ? 35 : 75 }
+        },
+        "3": {
+          description: `Year 3: The scenario outcome stabilizes, leading to ${baseRisk === 'high' ? 'heightened operational overhead and secondary complexity factors.' : 'gradual system normalization and compounding strategic returns.'}`,
+          probability: Math.min(95, Math.max(5, baseProb + (baseRisk === 'high' ? 8 : -4))),
+          risk_level: baseRisk === 'high' ? 'high' : 'low',
+          emotional_impact: baseRisk === 'high' ? 'Anxious' : 'Fulfilled',
+          radar_metrics: { risk: Math.min(100, riskVal + 5), reward: Math.min(100, rewardVal + 10), time_cost: 50, emotional_toll: baseRisk === 'high' ? 75 : 30, reversibility: Math.max(0, (baseRisk === 'high' ? 35 : 75) - 10) }
+        },
+        "5": {
+          description: `Year 5: Structural path dependencies assert themselves. Results yield ${baseRisk === 'high' ? 'significant resource depletion and persistent systemic friction.' : 'deeply integrated long-term stability and maximized utility yield.'}`,
+          probability: Math.min(95, Math.max(5, baseProb + (baseRisk === 'high' ? 12 : -8))),
+          risk_level: baseRisk === 'high' ? 'high' : 'low',
+          emotional_impact: baseRisk === 'high' ? 'Stressed' : 'Serene',
+          radar_metrics: { risk: Math.min(100, riskVal + 10), reward: Math.min(100, rewardVal + 20), time_cost: 65, emotional_toll: baseRisk === 'high' ? 80 : 20, reversibility: Math.max(0, (baseRisk === 'high' ? 35 : 75) - 20) }
+        },
+        "10": {
+          description: `Year 10: Generational timeline horizon fully realized. The decision is now ${baseRisk === 'high' ? 'a critical legacy bottleneck or a primary survival constraint.' : 'a foundational bedrock of system sustainability and compounding growth.'}`,
+          probability: Math.min(95, Math.max(5, baseProb + (baseRisk === 'high' ? 18 : -12))),
+          risk_level: baseRisk === 'high' ? 'high' : 'low',
+          emotional_impact: baseRisk === 'high' ? 'Regretful' : 'Wise',
+          radar_metrics: { risk: Math.min(100, riskVal + 15), reward: Math.min(100, rewardVal + 30), time_cost: 80, emotional_toll: baseRisk === 'high' ? 85 : 10, reversibility: Math.max(0, (baseRisk === 'high' ? 35 : 75) - 40) }
+        }
+      };
+    }
+    
+    // 2. Ensure consequence_tree
+    if (!s.consequence_tree || typeof s.consequence_tree !== 'object') {
+      const chain = s.causal_chain || { title: 'Initiate scenario track', probability: 100 };
+      
+      const buildFromChain = (node, depth = 1) => {
+        if (!node) return [];
+        const nextNode = node.next;
+        const subBranches = nextNode ? buildFromChain(nextNode, depth + 1) : [];
+        
+        // Add an alternative dummy branch at depth 1 or 2 to make it look branching
+        if (depth === 1) {
+          subBranches.push({
+            title: `Alternative ${depth + 1}nd Order Consequence (Variance pathway)`,
+            probability: Math.round(node.probability * 0.4),
+            branches: []
+          });
+        }
+        
+        return [{
+          title: node.title,
+          probability: node.probability || 80,
+          branches: subBranches
+        }];
+      };
+      
+      s.consequence_tree = {
+        title: s.title || 'Scenario Node',
+        probability: 100,
+        branches: buildFromChain(chain)
+      };
+    }
+    
+    return s;
+  });
 }
 
 /**
@@ -526,13 +647,29 @@ app.post('/simulate', async (req, res) => {
   const normalized = normalizeInput(decision);
   console.log(`[PREPROCESSOR] Normalized: "${decision}" -> "${normalized}"`);
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  
+  // Parse models from environment variables
+  const primaryModelStr = process.env.PRIMARY_MODEL || 'gemini/gemini-2.5-flash';
+  const model1Str = process.env.CONSENSUS_MODEL_1 || 'groq/llama-3.3-70b-versatile';
+  const model2Str = process.env.CONSENSUS_MODEL_2 || 'openrouter/meta-llama/llama-3-8b-instruct:free';
+
+  const primaryConfig = resolveModelConfig(primaryModelStr);
+  const model1Config = resolveModelConfig(model1Str);
+  const model2Config = resolveModelConfig(model2Str);
+
+  const primaryKey = getApiKeyForProvider(primaryConfig.provider);
+  const model1Key = getApiKeyForProvider(model1Config.provider);
+  const model2Key = getApiKeyForProvider(model2Config.provider);
+
+  const primaryDisplayName = getModelDisplayName(primaryModelStr);
+  const model1DisplayName = getModelDisplayName(model1Str);
+  const model2DisplayName = getModelDisplayName(model2Str);
+
   // 1. Generate local vector embedding & memory search
+  const embeddingKey = process.env.GEMINI_API_KEY;
   let embedding = null;
   try {
-    if (apiKey) {
-      embedding = await generateGeminiEmbedding(normalized, apiKey);
+    if (isKeyConfigured(embeddingKey)) {
+      embedding = await generateGeminiEmbedding(normalized, embeddingKey);
     }
   } catch (err) {
     console.error('[EMBEDDING ERROR] Failed to fetch embedding:', err.message);
@@ -541,62 +678,68 @@ app.post('/simulate', async (req, res) => {
   const memory = loadMemory();
   const temporalLink = findTemporalLink(embedding, normalized, memory);
 
-  // 2. Fetch main Gemini result
-  let geminiResult = null;
-  if (apiKey) {
-    console.log(`[AI MODE] Generating Gemini simulations for: "${normalized}"`);
+  // 2. Fetch primary simulation result
+  let primaryResult = null;
+  if (isKeyConfigured(primaryKey)) {
+    console.log(`[AI MODE] Generating primary simulation (${primaryDisplayName}) for: "${normalized}"`);
     try {
-      geminiResult = await generateGeminiSimulation(normalized, risk, personality, apiKey);
+      primaryResult = await generatePrimarySimulation(normalized, risk, personality, primaryConfig.provider, primaryConfig.model, primaryKey);
     } catch (err) {
-      console.error('[AI MODE ERROR] Failed calling Gemini, falling back to Server Simulator...', err.message);
-      geminiResult = generateServerSimulation(normalized, risk, personality);
+      console.error(`[AI MODE ERROR] Failed calling ${primaryDisplayName}, falling back to Server Simulator...`, err.message);
+      primaryResult = generateServerSimulation(normalized, risk, personality);
     }
   } else {
     console.log(`[SIMULATOR MODE] Serving local context scenarios for: "${normalized}"`);
-    geminiResult = generateServerSimulation(normalized, risk, personality);
+    primaryResult = generateServerSimulation(normalized, risk, personality);
   }
 
-  if (geminiResult.scenarios && Array.isArray(geminiResult.scenarios)) {
-    geminiResult.scenarios = geminiResult.scenarios.map(s => {
-      s.monte_carlo_distribution = runMonteCarlo(s.probability || 50, risk);
+  // Ensure scenarios contain temporal_outcomes and consequence_tree formats
+  if (primaryResult.scenarios && Array.isArray(primaryResult.scenarios)) {
+    primaryResult.scenarios = ensureTemporalAndTree(primaryResult.scenarios, risk, personality);
+    
+    // Generate Monte Carlo distribution for each timeline milestone
+    primaryResult.scenarios = primaryResult.scenarios.map(s => {
+      if (s.temporal_outcomes) {
+        Object.keys(s.temporal_outcomes).forEach(year => {
+          const outcome = s.temporal_outcomes[year];
+          outcome.monte_carlo_distribution = runMonteCarlo(outcome.probability || 50, risk);
+        });
+      }
       return s;
     });
   }
 
-  // 3. Parallel model consensus (GPT-4 and Claude)
-  let openaiResult = null;
-  let claudeResult = null;
-  
-  const openaiKey = process.env.OPENAI_API_KEY;
-  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  // 3. Parallel model consensus
+  let model1Result = null;
+  let model2Result = null;
   const promises = [];
 
-  if (openaiKey) {
-    console.log('[AI MODE] Querying GPT-4 in parallel...');
+  if (isKeyConfigured(model1Key)) {
+    console.log(`[AI MODE] Querying ${model1DisplayName} in parallel...`);
     promises.push(
-      generateOpenAISimulation(normalized, risk, personality, openaiKey)
-        .then(res => { openaiResult = res; })
+      generateModelSimulation(normalized, risk, personality, model1Config.provider, model1Config.model, model1Key)
+        .then(res => { model1Result = res; })
         .catch(err => {
-          console.error('[OPENAI ERROR] Failed:', err.message);
-          openaiResult = simulateModelResponse(geminiResult, 'GPT-4');
+          console.error(`[${model1DisplayName.toUpperCase()} ERROR] Failed:`, err.message);
+          model1Result = simulateModelResponse(primaryResult, model1DisplayName);
         })
     );
   } else {
-    openaiResult = simulateModelResponse(geminiResult, 'GPT-4');
+    model1Result = simulateModelResponse(primaryResult, model1DisplayName);
   }
 
-  if (anthropicKey) {
-    console.log('[AI MODE] Querying Claude in parallel...');
+  if (isKeyConfigured(model2Key)) {
+    console.log(`[AI MODE] Querying ${model2DisplayName} in parallel...`);
     promises.push(
-      generateClaudeSimulation(normalized, risk, personality, anthropicKey)
-        .then(res => { claudeResult = res; })
+      generateModelSimulation(normalized, risk, personality, model2Config.provider, model2Config.model, model2Key)
+        .then(res => { model2Result = res; })
         .catch(err => {
-          console.error('[CLAUDE ERROR] Failed:', err.message);
-          claudeResult = simulateModelResponse(geminiResult, 'Claude');
+          console.error(`[${model2DisplayName.toUpperCase()} ERROR] Failed:`, err.message);
+          model2Result = simulateModelResponse(primaryResult, model2DisplayName);
         })
     );
   } else {
-    claudeResult = simulateModelResponse(geminiResult, 'Claude');
+    model2Result = simulateModelResponse(primaryResult, model2DisplayName);
   }
 
   if (promises.length > 0) {
@@ -604,12 +747,12 @@ app.post('/simulate', async (req, res) => {
   }
 
   // 4. Calculate Consensus and combine payloads
-  const consensus = calculateConsensus(geminiResult, openaiResult, claudeResult);
-  geminiResult.multi_model_comparison = consensus;
+  const consensus = calculateConsensus(primaryResult, model1Result, model2Result, primaryDisplayName, model1DisplayName, model2DisplayName);
+  primaryResult.multi_model_comparison = consensus;
   
   if (temporalLink) {
     console.log(`[MEMORY RECALL] Found temporal link: "${temporalLink.decision}" (${temporalLink.similarity}% similarity)`);
-    geminiResult.temporal_memory_recall = temporalLink;
+    primaryResult.temporal_memory_recall = temporalLink;
   }
 
   // 5. Save current query into local memory JSON file
@@ -619,23 +762,83 @@ app.post('/simulate', async (req, res) => {
       decision: normalized,
       timestamp: new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }),
       embedding: embedding,
-      result_summary: geminiResult.decision_summary
+      result_summary: primaryResult.decision_summary
     });
     saveMemory(memory);
   }
 
-  return res.json(geminiResult);
+  return res.json(primaryResult);
 });
 
+app.post('/transcribe', async (req, res) => {
+  const { audio } = req.body;
+  if (!audio) {
+    return res.status(400).json({ error: 'Audio data is required.' });
+  }
 
-/**
- * Call Gemini 2.5 Flash API and instruct it to return a clean JSON payload matching our schema
- */
-async function generateGeminiSimulation(decision, risk, personality, apiKey) {
-  const modelName = 'gemini-2.5-flash';
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+  const groqKey = process.env.GROQ_API_KEY;
+  if (!isKeyConfigured(groqKey)) {
+    console.warn('[TRANSCRIBE] GROQ_API_KEY is not set or placeholder. Returning diagnostic text.');
+    return res.json({ 
+      text: "[Diagnostic Warning] Voice recorded successfully! However, GROQ_API_KEY is missing in backend/.env. Please obtain a free key at console.groq.com to activate AI speech-to-text." 
+    });
+  }
 
-  // Formulate a strict system instruction prompt
+  let base64Data = audio;
+  let fileExtension = 'webm';
+  if (base64Data.includes(';base64,')) {
+    const header = base64Data.split(';base64,')[0];
+    if (header.includes('audio/m4a') || header.includes('audio/x-m4a') || header.includes('audio/mp4') || header.includes('audio/aac')) {
+      fileExtension = 'm4a';
+    } else if (header.includes('audio/wav') || header.includes('audio/x-wav')) {
+      fileExtension = 'wav';
+    }
+    base64Data = base64Data.split(';base64,')[1];
+  }
+
+  const tempFilePath = path.join(__dirname, `temp_audio_${Date.now()}.${fileExtension}`);
+  try {
+    const buffer = Buffer.from(base64Data, 'base64');
+    fs.writeFileSync(tempFilePath, buffer);
+
+    const fileBlob = new Blob([buffer], { type: `audio/${fileExtension}` });
+    const formData = new FormData();
+    formData.append('file', fileBlob, `audio.${fileExtension}`);
+    formData.append('model', 'whisper-large-v3');
+    formData.append('response_format', 'json');
+
+    console.log('[TRANSCRIBE] Sending audio payload to Groq Whisper...');
+    const response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${groqKey}`
+      },
+      body: formData
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Groq Whisper returned status ${response.status}: ${errText}`);
+    }
+
+    const data = await response.json();
+    console.log(`[TRANSCRIBE] Successful! Text: "${data.text}"`);
+    return res.json({ text: data.text });
+  } catch (err) {
+    console.error('[TRANSCRIBE ERROR] Failed to transcribe:', err.message);
+    return res.status(500).json({ error: 'Failed to transcribe audio.', details: err.message });
+  } finally {
+    if (fs.existsSync(tempFilePath)) {
+      try {
+        fs.unlinkSync(tempFilePath);
+      } catch (e) {
+        console.error('[TRANSCRIBE] Failed to delete temp file:', e.message);
+      }
+    }
+  }
+});
+
+async function generatePrimarySimulation(decision, risk, personality, provider, model, apiKey) {
   const prompt = `You are "Decision Simulator AI", an industry-grade analytical decision-science and cognitive modeling system.
 Your purpose is to generate realistic, explainable, and behaviorally grounded decision simulations.
 
@@ -664,23 +867,17 @@ INSTRUCTIONS:
    - Formulate a 'cooldown_reframe' (a calm, systems-level, highly objective rephrasing of the decision query that strips away all subjective urgency or anxiety).
 5. SCENARIO DIVERSIFICATION ENGINE:
    - Model exactly 3 highly realistic, distinct future scenarios representing tradeoffs, conflicting outcomes, and alternative behavioral tracks.
-   - Keep each scenario's 'description' limited to exactly 1-2 concise, analytical sentences.
-   - Keep 'emotional_impact' to a concise 1-2 word professional state.
-   - Every scenario's 'reasoning' block MUST be formatted exactly as:
-     "Probability Heuristic: [Explain how the X% probability is derived from a base rate adjusted by the selected Risk Tolerance (${risk}) and Personality (${personality})]. Systems Analysis: [Explain the concise systems cause-and-effect chain (max 2 sentences)]."
-   - Every scenario MUST include a 'causal_chain' object representing 1st, 2nd, and 3rd order cascading consequences. The format is:
-     "causal_chain": {
-       "title": "1st Order Action (Immediate response/step)",
-       "probability": 100,
-       "next": {
-         "title": "2nd Order Consequence (Immediate secondary reaction)",
-         "probability": 75,
-         "next": {
-           "title": "3rd Order Impact (Long-term systemic result)",
-           "probability": 45
-         }
-       }
-     }
+   - For each scenario, generate a 'temporal_outcomes' object containing forecasts for horizons "1" (1 year), "3" (3 years), "5" (5 years), and "10" (10 years).
+   - Each horizon forecast MUST include:
+     * 'description': Concise scenario outcome for this specific year (exactly 1-2 sentences).
+     * 'probability': 0-100 expected percentage of this scenario version occurring, adjusted by Risk Tolerance (${risk}) and Personality (${personality}).
+     * 'risk_level': "low", "medium", or "high" showing how risk exposure changes.
+     * 'emotional_impact': Concise 1-2 words describing the user's emotional state.
+     * 'radar_metrics': An object with five numerical values (0-100): 'risk', 'reward', 'time_cost', 'emotional_toll', 'reversibility'.
+   - Every scenario MUST include a 'consequence_tree' representing branching 1st, 2nd, and 3rd order outcomes. A node has:
+     * 'title': Text description (e.g. "Action taken" or "System reaction").
+     * 'probability': 0-100 percentage.
+     * 'branches': Array of child nodes with the same structure (each parent can branch into 1 or 2 child nodes, creating a real branching tree explorer. Max depth is 3 levels).
 6. STRUCTURED PERSPECTIVE SIMULATION:
    - Refine the multi-agent debate into a structured analysis of conflicting viewpoints. Structure 'boardroom_debate' with exactly 2 expert perspectives:
      * "Logical & Behavioral Perspective": Analyzes cognitive patterns, immediate impulses, and emotional framing.
@@ -716,23 +913,63 @@ Return response ONLY as a single valid JSON object following this structure:
   "scenarios": [
     {
       "title": "Scenario Title",
-      "description": "Concise scenario outcome (1-2 sentences).",
-      "timeline": "Timeline span",
-      "risk_level": "low or medium or high",
-      "emotional_impact": "Concise state",
-      "probability": 45,
-      "reasoning": "Probability Heuristic: The probability of 45% is derived from... Systems Analysis: ...",
-      "causal_chain": {
-        "title": "1st Order Action",
-        "probability": 100,
-        "next": {
-          "title": "2nd Order Consequence",
-          "probability": 75,
-          "next": {
-            "title": "3rd Order Consequence",
-            "probability": 45
-          }
+      "temporal_outcomes": {
+        "1": {
+          "description": "Year 1 outcome description (1-2 sentences).",
+          "probability": 65,
+          "risk_level": "medium",
+          "emotional_impact": "Measured",
+          "radar_metrics": { "risk": 50, "reward": 45, "time_cost": 30, "emotional_toll": 40, "reversibility": 80 }
+        },
+        "3": {
+          "description": "Year 3 outcome description (1-2 sentences).",
+          "probability": 72,
+          "risk_level": "low",
+          "emotional_impact": "Optimistic",
+          "radar_metrics": { "risk": 40, "reward": 65, "time_cost": 45, "emotional_toll": 30, "reversibility": 75 }
+        },
+        "5": {
+          "description": "Year 5 outcome description (1-2 sentences).",
+          "probability": 80,
+          "risk_level": "low",
+          "emotional_impact": "Fulfilled",
+          "radar_metrics": { "risk": 30, "reward": 80, "time_cost": 50, "emotional_toll": 20, "reversibility": 70 }
+        },
+        "10": {
+          "description": "Year 10 outcome description (1-2 sentences).",
+          "probability": 85,
+          "risk_level": "low",
+          "emotional_impact": "Serene",
+          "radar_metrics": { "risk": 20, "reward": 90, "time_cost": 55, "emotional_toll": 10, "reversibility": 60 }
         }
+      },
+      "consequence_tree": {
+        "title": "Scenario Root Action",
+        "probability": 100,
+        "branches": [
+          {
+            "title": "1st Order Branch A",
+            "probability": 75,
+            "branches": [
+              {
+                "title": "2nd Order Sub-Branch A1",
+                "probability": 60,
+                "branches": [
+                  {
+                    "title": "3rd Order Final Branch A1a",
+                    "probability": 40,
+                    "branches": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "title": "1st Order Branch B",
+            "probability": 25,
+            "branches": []
+          }
+        ]
       }
     }
   ],
@@ -766,56 +1003,9 @@ Return response ONLY as a single valid JSON object following this structure:
   },
   "final_note": "A neutral analytical disclaimer."
 }
-
 Do NOT wrap the JSON inside markdown code blocks. Return raw JSON text only.`;
 
-  // Setup a 45-second abort timeout on the server side to accommodate deep reasoning AI
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => {
-    controller.abort();
-  }, 45000);
-
-  try {
-    // Make standard Node fetch request
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          responseMimeType: 'application/json'
-        }
-      }),
-      signal: controller.signal
-    });
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Gemini API returned status ${response.status}: ${errorText}`);
-    }
-
-    const data = await response.json();
-    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    if (!rawText) {
-      throw new Error('Gemini API response contained empty generation candidate.');
-    }
-
-    // Clean and parse JSON safely
-    let cleanText = rawText.trim();
-    if (cleanText.includes('```json')) {
-      cleanText = cleanText.split('```json')[1].split('```')[0].trim();
-    } else if (cleanText.includes('```')) {
-      cleanText = cleanText.split('```')[1].split('```')[0].trim();
-    }
-
-    return JSON.parse(cleanText);
-  } catch (error) {
-    clearTimeout(timeoutId);
-    throw error;
-  }
+  return await callLLM(provider, model, apiKey, prompt, true);
 }
 
 /**

@@ -160,6 +160,118 @@ function normalizeInput(decision) {
 }
 
 /**
+ * Local Monte Carlo Simulator (fallback for offline mode)
+ */
+function runMonteCarloLocal(baseProbability, riskTolerance) {
+  const mean = parseFloat(baseProbability) || 50;
+  let stdDev = 12;
+  if (riskTolerance) {
+    const r = riskTolerance.toLowerCase();
+    if (r === 'low') stdDev = 8;
+    else if (r === 'high') stdDev = 18;
+  }
+  const bins = new Array(10).fill(0);
+  const numTrials = 10000;
+  for (let i = 0; i < numTrials; i++) {
+    let u1 = 0, u2 = 0;
+    while (u1 === 0) u1 = Math.random();
+    while (u2 === 0) u2 = Math.random();
+    const z0 = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
+    let sample = mean + z0 * stdDev;
+    if (sample < 0) sample = 0;
+    if (sample > 100) sample = 100;
+    let binIdx = Math.floor(sample / 10);
+    if (binIdx > 9) binIdx = 9;
+    if (binIdx < 0) binIdx = 0;
+    bins[binIdx]++;
+  }
+  return bins;
+}
+
+/**
+ * Programmatic mapper to enrich scenarios with 1 / 3 / 5 / 10 year temporal outcomes
+ * and a branching consequence tree.
+ */
+function ensureTemporalAndTreeLocal(scenarios, risk, personality) {
+  if (!scenarios || !Array.isArray(scenarios)) return [];
+  return scenarios.map(s => {
+    // 1. Ensure temporal_outcomes
+    if (!s.temporal_outcomes || typeof s.temporal_outcomes !== 'object') {
+      const baseProb = s.probability || 50;
+      const baseRisk = s.risk_level || 'medium';
+      const baseEmotion = s.emotional_impact || 'Measured';
+      const baseDesc = s.description || 'Proceed with the action.';
+      
+      const r = risk || 'medium';
+      const p = personality || 'balanced';
+      
+      const riskVal = baseRisk === 'high' ? 80 : baseRisk === 'medium' ? 50 : 25;
+      const rewardVal = p === 'risk-taker' ? 85 : 60;
+      
+      s.temporal_outcomes = {
+        "1": {
+          description: `Year 1: ${baseDesc}`,
+          probability: baseProb,
+          risk_level: baseRisk,
+          emotional_impact: baseEmotion,
+          radar_metrics: { risk: riskVal, reward: rewardVal, time_cost: 40, emotional_toll: baseRisk === 'high' ? 70 : 40, reversibility: baseRisk === 'high' ? 35 : 75 }
+        },
+        "3": {
+          description: `Year 3: The scenario outcome stabilizes, leading to ${baseRisk === 'high' ? 'heightened operational overhead and secondary complexity factors.' : 'gradual system normalization and compounding strategic returns.'}`,
+          probability: Math.min(95, Math.max(5, baseProb + (baseRisk === 'high' ? 8 : -4))),
+          risk_level: baseRisk === 'high' ? 'high' : 'low',
+          emotional_impact: baseRisk === 'high' ? 'Anxious' : 'Fulfilled',
+          radar_metrics: { risk: Math.min(100, riskVal + 5), reward: Math.min(100, rewardVal + 10), time_cost: 50, emotional_toll: baseRisk === 'high' ? 75 : 30, reversibility: Math.max(0, (baseRisk === 'high' ? 35 : 75) - 10) }
+        },
+        "5": {
+          description: `Year 5: Structural path dependencies assert themselves. Results yield ${baseRisk === 'high' ? 'significant resource depletion and persistent systemic friction.' : 'deeply integrated long-term stability and maximized utility yield.'}`,
+          probability: Math.min(95, Math.max(5, baseProb + (baseRisk === 'high' ? 12 : -8))),
+          risk_level: baseRisk === 'high' ? 'high' : 'low',
+          emotional_impact: baseRisk === 'high' ? 'Stressed' : 'Serene',
+          radar_metrics: { risk: Math.min(100, riskVal + 10), reward: Math.min(100, rewardVal + 20), time_cost: 65, emotional_toll: baseRisk === 'high' ? 80 : 20, reversibility: Math.max(0, (baseRisk === 'high' ? 35 : 75) - 20) }
+        },
+        "10": {
+          description: `Year 10: Generational timeline horizon fully realized. The decision is now ${baseRisk === 'high' ? 'a critical legacy bottleneck or a primary survival constraint.' : 'a foundational bedrock of system sustainability and compounding growth.'}`,
+          probability: Math.min(95, Math.max(5, baseProb + (baseRisk === 'high' ? 18 : -12))),
+          risk_level: baseRisk === 'high' ? 'high' : 'low',
+          emotional_impact: baseRisk === 'high' ? 'Regretful' : 'Wise',
+          radar_metrics: { risk: Math.min(100, riskVal + 15), reward: Math.min(100, rewardVal + 30), time_cost: 80, emotional_toll: baseRisk === 'high' ? 85 : 10, reversibility: Math.max(0, (baseRisk === 'high' ? 35 : 75) - 40) }
+        }
+      };
+    }
+    
+    // 2. Ensure consequence_tree
+    if (!s.consequence_tree || typeof s.consequence_tree !== 'object') {
+      const chain = s.causal_chain || { title: 'Initiate scenario track', probability: 100 };
+      
+      const buildFromChain = (node, depth = 1) => {
+        if (!node) return [];
+        const nextNode = node.next;
+        const subBranches = nextNode ? buildFromChain(nextNode, depth + 1) : [];
+        if (depth === 1) {
+          subBranches.push({
+            title: `Alternative ${depth + 1}nd Order Consequence (Variance pathway)`,
+            probability: Math.round(node.probability * 0.4),
+            branches: []
+          });
+        }
+        return [{
+          title: node.title,
+          probability: node.probability || 80,
+          branches: subBranches
+        }];
+      };
+      s.consequence_tree = {
+        title: s.title || 'Scenario Node',
+        probability: 100,
+        branches: buildFromChain(chain)
+      };
+    }
+    return s;
+  });
+}
+
+/**
  * Simulates future outcomes for a decision
  * Calls POST /simulate. Falls back to a local generator on failure/network errors.
  */
@@ -171,14 +283,42 @@ export async function simulateDecision(decision, risk, personality) {
       risk,
       personality,
     });
-    return response.data;
+    
+    let result = response.data;
+    // Client-side safety normalization check
+    if (result.scenarios && Array.isArray(result.scenarios)) {
+      result.scenarios = ensureTemporalAndTreeLocal(result.scenarios, risk, personality);
+      result.scenarios.forEach(s => {
+        if (s.temporal_outcomes) {
+          Object.keys(s.temporal_outcomes).forEach(year => {
+            const outcome = s.temporal_outcomes[year];
+            if (!outcome.monte_carlo_distribution) {
+              outcome.monte_carlo_distribution = runMonteCarloLocal(outcome.probability || 50, risk);
+            }
+          });
+        }
+      });
+    }
+    return result;
   } catch (error) {
     console.warn('Backend API connection failed, executing intelligent local simulation fallback...', error.message);
     
     // Artificial delay to simulate real network request and showcase loading state nicely
     await new Promise((resolve) => setTimeout(resolve, 1500));
     
-    return generateOfflineSimulation(normalized, risk, personality);
+    let offlineResult = generateOfflineSimulation(normalized, risk, personality);
+    if (offlineResult.scenarios && Array.isArray(offlineResult.scenarios)) {
+      offlineResult.scenarios = ensureTemporalAndTreeLocal(offlineResult.scenarios, risk, personality);
+      offlineResult.scenarios.forEach(s => {
+        if (s.temporal_outcomes) {
+          Object.keys(s.temporal_outcomes).forEach(year => {
+            const outcome = s.temporal_outcomes[year];
+            outcome.monte_carlo_distribution = runMonteCarloLocal(outcome.probability || 50, risk);
+          });
+        }
+      });
+    }
+    return offlineResult;
   }
 }
 
@@ -767,4 +907,18 @@ function generateOfflineSocraticQuestions(decision) {
       "What critical information is currently missing from your decision-making equation?"
     ]
   };
+}
+
+/**
+ * Send base64 audio payload to backend for transcription
+ */
+export async function transcribeAudio(base64Audio) {
+  try {
+    const transcribeUrl = API_URL.replace('/simulate', '/transcribe');
+    const response = await api.post(transcribeUrl, { audio: base64Audio });
+    return response.data;
+  } catch (error) {
+    console.error('Audio transcription request failed:', error.message);
+    throw error;
+  }
 }

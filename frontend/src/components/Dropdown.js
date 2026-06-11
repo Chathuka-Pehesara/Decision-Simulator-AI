@@ -10,7 +10,7 @@ import {
   SafeAreaView,
   Platform
 } from 'react-native';
-import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY } from '../styles/theme';
+import { useTheme } from '../context/ThemeContext';
 
 export default function Dropdown({ 
   label, 
@@ -20,6 +20,7 @@ export default function Dropdown({
   options = [] 
 }) {
   const [modalVisible, setModalVisible] = useState(false);
+  const { theme, themeName } = useTheme();
 
   const selectedOption = options.find(opt => opt.value === selectedValue);
 
@@ -28,19 +29,56 @@ export default function Dropdown({
     setModalVisible(false);
   };
 
+  const WEB_STYLES = {
+    trigger: {
+      transition: 'all 0.3s ease',
+      boxShadow: themeName === 'sci-fi' ? 'inset 0 0 15px rgba(0, 229, 255, 0.03)' : 'none',
+    }
+  };
+
   return (
     <View style={styles.container}>
-      {label && <Text style={styles.label}>{label}</Text>}
+      {label && (
+        <Text style={[
+          styles.label,
+          {
+            color: theme.colors.textSecondary,
+            fontFamily: themeName === 'minimal' ? 'sans-serif' : 'Orbitron',
+            fontWeight: themeName === 'accessibility' ? '900' : '700',
+          }
+        ]}>
+          {label}
+        </Text>
+      )}
       
       <TouchableOpacity
         activeOpacity={0.8}
         onPress={() => setModalVisible(true)}
-        style={[styles.trigger, Platform.OS === 'web' && WEB_STYLES.trigger]}
+        style={[
+          styles.trigger,
+          {
+            borderColor: theme.colors.border,
+            borderLeftColor: theme.colors.accentBlue,
+            backgroundColor: theme.colors.surface,
+            borderRadius: theme.borderRadius.md,
+            borderWidth: themeName === 'accessibility' ? 2 : 1,
+            borderLeftWidth: themeName === 'accessibility' ? 5 : 4,
+          },
+          Platform.OS === 'web' && WEB_STYLES.trigger
+        ]}
       >
-        <Text style={[styles.triggerText, !selectedOption && styles.placeholder]}>
+        <Text style={[
+          styles.triggerText,
+          {
+            color: selectedOption ? theme.colors.accentBlue : theme.colors.textMuted,
+            fontWeight: themeName === 'accessibility' ? 'bold' : '600',
+          }
+        ]}>
           {selectedOption ? selectedOption.label : placeholder}
         </Text>
-        <Text style={styles.arrow}>{modalVisible ? '▼' : '▶'}</Text>
+        <Text style={[styles.arrow, { color: theme.colors.accentBlue }]}>
+          {modalVisible ? '▼' : '▶'}
+        </Text>
       </TouchableOpacity>
 
       <Modal
@@ -49,28 +87,48 @@ export default function Dropdown({
         visible={modalVisible}
         onRequestClose={() => setModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
+        <View style={[styles.modalOverlay, { backgroundColor: theme.colors.overlay }]}>
           <TouchableOpacity 
             style={styles.modalDismiss} 
             activeOpacity={1} 
             onPress={() => setModalVisible(false)}
           />
-          <View style={styles.modalContent}>
+          <View style={[
+            styles.modalContent,
+            {
+              backgroundColor: theme.colors.card,
+              borderColor: theme.colors.border,
+              borderWidth: themeName === 'accessibility' ? 2.5 : 1.5,
+              borderTopLeftRadius: theme.borderRadius.lg,
+              borderTopRightRadius: theme.borderRadius.lg,
+            }
+          ]}>
             <SafeAreaView style={styles.safeArea}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>{label || 'Select Option'}</Text>
+              <View style={[styles.modalHeader, { borderBottomColor: theme.colors.divider }]}>
+                <Text style={[
+                  styles.modalTitle,
+                  {
+                    color: theme.colors.textPrimary,
+                    fontFamily: themeName === 'minimal' ? 'sans-serif' : 'Orbitron',
+                    fontWeight: themeName === 'accessibility' ? '900' : '800',
+                  }
+                ]}>
+                  {label || 'Select Option'}
+                </Text>
                 <TouchableOpacity 
                   onPress={() => setModalVisible(false)}
                   style={styles.closeButton}
                 >
-                  <Text style={styles.closeButtonText}>✕</Text>
+                  <Text style={[styles.closeButtonText, { color: theme.colors.textSecondary }]}>✕</Text>
                 </TouchableOpacity>
               </View>
 
               <FlatList
                 data={options}
                 keyExtractor={(item) => item.value}
-                ItemSeparatorComponent={() => <View style={styles.separator} />}
+                ItemSeparatorComponent={() => (
+                  <View style={[styles.separator, { backgroundColor: theme.colors.divider }]} />
+                )}
                 contentContainerStyle={styles.listContent}
                 renderItem={({ item }) => {
                   const isSelected = item.value === selectedValue;
@@ -79,18 +137,23 @@ export default function Dropdown({
                       activeOpacity={0.7}
                       style={[
                         styles.optionItem,
-                        isSelected && styles.optionItemActive
+                        { borderRadius: theme.borderRadius.md },
+                        isSelected && { backgroundColor: theme.colors.accentBlueLight }
                       ]}
                       onPress={() => handleSelect(item.value)}
                     >
                       <Text style={[
                         styles.optionText,
-                        isSelected && styles.optionTextActive
+                        {
+                          color: isSelected ? theme.colors.accentBlue : theme.colors.textPrimary,
+                          fontWeight: isSelected ? '700' : themeName === 'accessibility' ? 'bold' : '500',
+                          fontSize: themeName === 'accessibility' ? 16 : 14,
+                        }
                       ]}>
                         {item.label}
                       </Text>
                       {isSelected && (
-                        <Text style={styles.checkmark}>✓</Text>
+                        <Text style={[styles.checkmark, { color: theme.colors.accentBlue }]}>✓</Text>
                       )}
                     </TouchableOpacity>
                   );
@@ -104,36 +167,19 @@ export default function Dropdown({
   );
 }
 
-// Web-only Styles (bypass Hermes static parser validation inside StyleSheet.create)
-const WEB_STYLES = {
-  trigger: {
-    transition: 'all 0.3s ease',
-    boxShadow: 'inset 0 0 15px rgba(0, 229, 255, 0.03)',
-  }
-};
-
 const styles = StyleSheet.create({
   container: {
-    marginBottom: SPACING.md,
+    marginBottom: 16,
   },
   label: {
-    fontFamily: 'Orbitron',
     fontSize: 10,
-    fontWeight: '700',
-    color: 'rgba(0, 229, 255, 0.7)',
-    marginBottom: SPACING.xs,
+    marginBottom: 4,
     textTransform: 'uppercase',
     letterSpacing: 1.5,
   },
   trigger: {
     height: 52,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 229, 255, 0.15)',
-    borderLeftWidth: 4,
-    borderLeftColor: '#00e5ff',
-    borderRadius: BORDER_RADIUS.md,
-    backgroundColor: 'rgba(0, 229, 255, 0.04)',
-    paddingHorizontal: SPACING.md,
+    paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -141,89 +187,63 @@ const styles = StyleSheet.create({
   triggerText: {
     fontFamily: 'IBM Plex Mono',
     fontSize: 14,
-    fontWeight: '600',
-    color: '#00e5ff',
-  },
-  placeholder: {
-    color: '#587396',
   },
   arrow: {
     fontSize: 10,
-    color: '#00e5ff',
     fontWeight: 'bold',
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(3, 5, 13, 0.85)',
     justifyContent: 'flex-end',
   },
   modalDismiss: {
     flex: 1,
   },
   modalContent: {
-    backgroundColor: COLORS.card,
-    borderTopLeftRadius: BORDER_RADIUS.lg,
-    borderTopRightRadius: BORDER_RADIUS.lg,
-    borderWidth: 1.5,
-    borderColor: COLORS.border,
     maxHeight: '50%',
   },
   safeArea: {
-    paddingBottom: SPACING.lg,
+    paddingBottom: 24,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
+    paddingHorizontal: 24,
+    paddingVertical: 16,
     borderBottomWidth: 1.5,
-    borderBottomColor: COLORS.divider,
   },
   modalTitle: {
-    ...TYPOGRAPHY.h3,
-    fontWeight: '800',
-    color: COLORS.textPrimary,
+    fontSize: 14,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
   },
   closeButton: {
-    padding: SPACING.xs,
+    padding: 4,
   },
   closeButtonText: {
     fontSize: 18,
-    color: COLORS.textSecondary,
     fontWeight: '700',
   },
   listContent: {
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
   optionItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.sm,
-    borderRadius: BORDER_RADIUS.md,
-  },
-  optionItemActive: {
-    backgroundColor: COLORS.accentBlueLight,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
   },
   optionText: {
-    ...TYPOGRAPHY.body,
-    color: COLORS.textPrimary,
-    fontWeight: '500',
-  },
-  optionTextActive: {
-    color: COLORS.accentBlue,
-    fontWeight: '700',
+    fontFamily: 'IBM Plex Mono',
   },
   checkmark: {
     fontSize: 16,
-    color: COLORS.accentBlue,
     fontWeight: 'bold',
   },
   separator: {
     height: 1,
-    backgroundColor: COLORS.divider,
   },
 });

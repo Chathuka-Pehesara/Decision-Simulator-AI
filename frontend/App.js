@@ -15,9 +15,83 @@ import HistoryScreen from './src/screens/HistoryScreen';
 import CompareScreen from './src/screens/CompareScreen';
 
 // Theme Spacing & Colors
-import { COLORS } from './src/styles/theme';
+import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 
 const Stack = createNativeStackNavigator();
+
+function MainAppContent() {
+  const { theme, themeName } = useTheme();
+
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      // 1. Dynamic background sync on Web
+      document.body.style.backgroundColor = theme.colors.background;
+      
+      // 2. Enable/disable starfields & radar sweep based on themeName
+      if (themeName === 'sci-fi') {
+        document.body.classList.add('radar-active');
+      } else {
+        document.body.classList.remove('radar-active');
+      }
+    }
+  }, [theme, themeName]);
+
+  return (
+    <NavigationContainer>
+      <StatusBar style={theme.isDark ? 'light' : 'dark'} />
+      <Stack.Navigator
+        initialRouteName="Home"
+        screenOptions={{
+          headerStyle: {
+            backgroundColor: theme.colors.background,
+          },
+          headerShadowVisible: false,
+          headerTitleStyle: {
+            fontWeight: themeName === 'accessibility' ? '900' : '700',
+            fontSize: themeName === 'accessibility' ? 18 : 16,
+            color: theme.colors.textPrimary,
+            fontFamily: themeName === 'minimal' ? 'sans-serif' : 'Orbitron',
+            letterSpacing: themeName === 'accessibility' ? 2 : 1,
+          },
+          headerTintColor: theme.colors.accentBlue, // Tint color for back buttons
+          headerBackTitleVisible: false,      // Clean back arrow only
+          contentStyle: {
+            backgroundColor: theme.colors.background, // Maintain consistent background
+          },
+        }}
+      >
+        <Stack.Screen 
+          name="Home" 
+          component={HomeScreen} 
+          options={{ 
+            headerShown: false,
+          }} 
+        />
+        <Stack.Screen 
+          name="Result" 
+          component={ResultScreen} 
+          options={{ 
+            title: 'Simulation Report',
+          }} 
+        />
+        <Stack.Screen 
+          name="History" 
+          component={HistoryScreen} 
+          options={{ 
+            title: 'Simulation History',
+          }} 
+        />
+        <Stack.Screen 
+          name="Compare" 
+          component={CompareScreen} 
+          options={{ 
+            title: 'Decision Comparer',
+          }} 
+        />
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+}
 
 export default function App() {
   const [fontsLoaded] = useFonts({
@@ -37,26 +111,24 @@ export default function App() {
       const customStyle = document.createElement('style');
       customStyle.type = 'text/css';
       customStyle.appendChild(document.createTextNode(`
-        /* Font assignments */
-        input, textarea, select, button, .mono-font, div, span, p, a {
+        /* Font assignments default */
+        .mono-font {
           font-family: 'IBM Plex Mono', monospace !important;
         }
-        h1, h2, h3, label, .orbitron-font {
+        .orbitron-font {
           font-family: 'Orbitron', sans-serif !important;
-          letter-spacing: 0.12em !important;
         }
 
         /* Starfield / Radial cosmic matter / Grid pattern + Noise Grain */
-        body {
-          background-color: #020408 !important;
+        body.radar-active {
           background-image: 
             radial-gradient(circle at 50% 50%, rgba(0, 229, 255, 0.07) 0%, transparent 60%),
             radial-gradient(circle at 10% 80%, rgba(168, 85, 247, 0.05) 0%, transparent 50%),
             linear-gradient(rgba(0, 229, 255, 0.015) 1px, transparent 1px),
             linear-gradient(90deg, rgba(0, 229, 255, 0.015) 1px, transparent 1px),
-            url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.03'/%3E%3C/svg%3E");
-          background-size: 100% 100%, 100% 100%, 25px 25px, 25px 25px, auto;
-          background-attachment: fixed;
+            url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.03'/%3E%3C/svg%3E") !important;
+          background-size: 100% 100%, 100% 100%, 25px 25px, 25px 25px, auto !important;
+          background-attachment: fixed !important;
           position: relative;
           min-height: 100vh;
           overflow-x: hidden;
@@ -69,7 +141,7 @@ export default function App() {
           90% { opacity: 0.6; }
           100% { top: 120%; opacity: 0; }
         }
-        .radar-active::after {
+        body.radar-active::after {
           content: "";
           position: fixed;
           left: 0;
@@ -176,7 +248,6 @@ export default function App() {
         }
       `));
       document.head.appendChild(customStyle);
-      document.body.classList.add('radar-active');
     }
   }, []);
 
@@ -189,56 +260,8 @@ export default function App() {
   }
 
   return (
-    <NavigationContainer>
-      <StatusBar style="light" />
-      <Stack.Navigator
-        initialRouteName="Home"
-        screenOptions={{
-          headerStyle: {
-            backgroundColor: COLORS.surface,
-          },
-          headerShadowVisible: false, // Standard premium border instead of heavy shadow
-          headerTitleStyle: {
-            fontWeight: '700',
-            fontSize: 16,
-            color: COLORS.textPrimary,
-          },
-          headerTintColor: COLORS.accentBlue, // Tint color for back buttons
-          headerBackTitleVisible: false,      // Clean back arrow only
-          contentStyle: {
-            backgroundColor: COLORS.background, // Maintain consistent background across all screens
-          },
-        }}
-      >
-        <Stack.Screen 
-          name="Home" 
-          component={HomeScreen} 
-          options={{ 
-            headerShown: false, // Custom elegant branding header inside screen itself
-          }} 
-        />
-        <Stack.Screen 
-          name="Result" 
-          component={ResultScreen} 
-          options={{ 
-            title: 'Simulation Report',
-          }} 
-        />
-        <Stack.Screen 
-          name="History" 
-          component={HistoryScreen} 
-          options={{ 
-            title: 'Simulation History',
-          }} 
-        />
-        <Stack.Screen 
-          name="Compare" 
-          component={CompareScreen} 
-          options={{ 
-            title: 'Decision Comparer',
-          }} 
-        />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <ThemeProvider>
+      <MainAppContent />
+    </ThemeProvider>
   );
 }

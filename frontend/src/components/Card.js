@@ -1,15 +1,32 @@
 // src/components/Card.js
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
-import { COLORS, SPACING, SHADOWS, BORDER_RADIUS } from '../styles/theme';
+import { View } from 'react-native';
+import { useTheme } from '../context/ThemeContext';
 
 export default function Card({ children, style, outlined = true, shadowed = true }) {
+  const { theme, themeName } = useTheme();
+
+  const shadowStyle = themeName === 'accessibility' || themeName === 'minimal' ? {} : {
+    shadowColor: theme.colors.accentBlue,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 3,
+  };
+
   return (
     <View
       style={[
-        styles.card,
-        outlined && styles.outlined,
-        shadowed && styles.shadowed,
+        {
+          backgroundColor: theme.colors.card,
+          borderRadius: theme.borderRadius.md,
+          padding: theme.spacing.md,
+        },
+        outlined && {
+          borderWidth: themeName === 'accessibility' ? 2 : 1.5,
+          borderColor: theme.colors.border,
+        },
+        shadowed && shadowStyle,
         style,
       ]}
     >
@@ -17,18 +34,3 @@ export default function Card({ children, style, outlined = true, shadowed = true
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: COLORS.card,
-    borderRadius: BORDER_RADIUS.md,
-    padding: SPACING.md,
-  },
-  outlined: {
-    borderWidth: 1.5,
-    borderColor: COLORS.border,
-  },
-  shadowed: {
-    ...SHADOWS.light,
-  },
-});
