@@ -7,16 +7,31 @@ import {
   FlatList, 
   TouchableOpacity, 
   SafeAreaView, 
-  Alert 
+  Alert,
+  ScrollView,
+  Platform
 } from 'react-native';
 import Card from '../components/Card';
 import Button from '../components/Button';
-import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY } from '../styles/theme';
+import { SPACING, BORDER_RADIUS } from '../styles/theme';
 import { getSimulations, deleteSimulation, clearAllSimulations } from '../services/storage';
+import { useTheme } from '../context/ThemeContext';
 
 export default function HistoryScreen({ navigation }) {
+  const { theme, themeName } = useTheme();
+  
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState('all');
+
+  const categories = [
+    { label: 'All', value: 'all' },
+    { label: 'Career', value: 'career' },
+    { label: 'Finance', value: 'finance' },
+    { label: 'Relationships', value: 'relationships' },
+    { label: 'Health', value: 'health' },
+    { label: 'General', value: 'general' }
+  ];
 
   const fetchHistory = async () => {
     setLoading(true);
@@ -26,11 +41,9 @@ export default function HistoryScreen({ navigation }) {
   };
 
   useEffect(() => {
-    // Reload history whenever this screen comes into focus
     const unsubscribe = navigation.addListener('focus', () => {
       fetchHistory();
     });
-
     return unsubscribe;
   }, [navigation]);
 
@@ -86,6 +99,20 @@ export default function HistoryScreen({ navigation }) {
     });
   };
 
+  const filteredHistory = selectedCategory === 'all' 
+    ? history 
+    : history.filter(item => (item.category || 'general') === selectedCategory);
+
+  const getCategoryColor = (cat) => {
+    switch (cat) {
+      case 'career': return theme.colors.accentBlue;
+      case 'finance': return '#f59e0b'; // Amber
+      case 'relationships': return theme.colors.accentViolet;
+      case 'health': return theme.colors.riskHigh;
+      default: return theme.colors.textMuted;
+    }
+  };
+
   const renderItem = ({ item }) => {
     const date = new Date(item.timestamp).toLocaleDateString(undefined, {
       month: 'short',
@@ -93,34 +120,58 @@ export default function HistoryScreen({ navigation }) {
       year: 'numeric',
     });
 
+    const isResolved = item.outcome !== null && item.outcome !== undefined;
+    const cat = item.category || 'general';
+
     return (
-      <Card style={styles.historyCard}>
+      <Card 
+        style={[
+          styles.historyCard, 
+          { 
+            borderColor: theme.colors.border,
+            backgroundColor: themeName === 'accessibility' ? '#000000' : theme.colors.card,
+            borderLeftWidth: 4,
+            borderLeftColor: getCategoryColor(cat)
+          }
+        ]}
+      >
         <TouchableOpacity 
           style={styles.cardContent}
           onPress={() => handleSelectRecord(item)}
           activeOpacity={0.7}
         >
           <View style={styles.cardHeader}>
-            <Text style={styles.dateText}>{date}</Text>
+            <Text style={[styles.dateText, { color: theme.colors.textMuted }]}>{date}</Text>
+            
             <View style={styles.metaRow}>
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>
+              {isResolved && (
+                <View style={[styles.resolvedBadge, { borderColor: theme.colors.accentBlue, backgroundColor: theme.colors.accentBlue + '18' }]}>
+                  <Text style={[styles.resolvedBadgeText, { color: theme.colors.accentBlue }]}>✅ RESOLVED</Text>
+                </View>
+              )}
+              <View style={[styles.badge, { borderColor: theme.colors.border }]}>
+                <Text style={[styles.badgeText, { color: theme.colors.textSecondary }]}>
                   {item.risk?.toUpperCase()} RISK
                 </Text>
               </View>
             </View>
           </View>
 
-          <Text style={styles.decisionText} numberOfLines={2}>
+          <Text style={[styles.decisionText, { color: theme.colors.textPrimary }]} numberOfLines={2}>
             {item.decision}
           </Text>
           
-          <Text style={styles.tapPrompt}>Tap to view simulation outcomes →</Text>
+          <View style={styles.cardFooter}>
+            <Text style={[styles.categoryLabel, { color: getCategoryColor(cat) }]}>
+              🏷️ {cat.toUpperCase()}
+            </Text>
+            <Text style={[styles.tapPrompt, { color: theme.colors.accentBlue }]}>View Outcomes →</Text>
+          </View>
         </TouchableOpacity>
 
         {/* Individual Delete Button */}
         <TouchableOpacity 
-          style={styles.deleteBtn}
+          style={[styles.deleteBtn, { borderLeftColor: theme.colors.divider }]}
           onPress={() => handleDelete(item.id, item.decision)}
           activeOpacity={0.6}
         >
@@ -131,12 +182,59 @@ export default function HistoryScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.safeContainer}>
+    <SafeAreaView style={[styles.safeContainer, { backgroundColor: theme.colors.background }]}>
       <View style={styles.container}>
+        
+        {/* Category Filters Bar */}
+        <View style={styles.filterSection}>
+          <Text style={[styles.filterLabel, { color: theme.colors.textSecondary, fontFamily: theme.typography.subtext.fontFamily }]}>
+            Filter By Category
+          </Text>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filterScroll}
+          >
+            {categories.map((cat) => {
+              const isActive = selectedCategory === cat.value;
+              return (
+                <TouchableOpacity
+                  key={cat.value}
+                  activeOpacity={0.85}
+                  onPress={() => setSelectedCategory(cat.value)}
+                  style={[
+                    styles.filterChip,
+                    {
+                      backgroundColor: isActive ? theme.colors.accentBlue : theme.colors.surface,
+                      borderColor: isActive ? theme.colors.accentBlue : theme.colors.border,
+                    }
+                  ]}
+                >
+                  <Text 
+                    style={[
+                      styles.filterChipText, 
+                      { 
+                        color: isActive 
+                          ? (themeName === 'sci-fi' ? '#03050d' : '#FFFFFF') 
+                          : theme.colors.textPrimary,
+                        fontWeight: isActive ? 'bold' : '500'
+                      }
+                    ]}
+                  >
+                    {cat.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+
         {/* Header Summary Row */}
-        {history.length > 0 && (
+        {filteredHistory.length > 0 && (
           <View style={styles.headerRow}>
-            <Text style={styles.countText}>{history.length} Saved Simulation{history.length > 1 ? 's' : ''}</Text>
+            <Text style={[styles.countText, { color: theme.colors.textSecondary }]}>
+              {filteredHistory.length} Record{filteredHistory.length > 1 ? 's' : ''} Found
+            </Text>
             <TouchableOpacity onPress={handleClearAll}>
               <Text style={styles.clearAllLink}>Clear All</Text>
             </TouchableOpacity>
@@ -144,22 +242,26 @@ export default function HistoryScreen({ navigation }) {
         )}
 
         {/* History List */}
-        {history.length === 0 ? (
+        {filteredHistory.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyIcon}>🔮</Text>
-            <Text style={styles.emptyTitle}>No History Found</Text>
-            <Text style={styles.emptySubtitle}>
-              Simulate decisions on the Home screen to view their generated futures here.
+            <Text style={[styles.emptyTitle, { color: theme.colors.textPrimary }]}>No Records Found</Text>
+            <Text style={[styles.emptySubtitle, { color: theme.colors.textMuted }]}>
+              {history.length === 0 
+                ? "Simulate decisions on the Home screen to view their generated futures here."
+                : `No decisions found for category '${selectedCategory}'.`}
             </Text>
-            <Button 
-              title="Go Simulate" 
-              onPress={() => navigation.navigate('Home')}
-              style={styles.emptyBtn}
-            />
+            {history.length === 0 && (
+              <Button 
+                title="Go Simulate" 
+                onPress={() => navigation.navigate('Home')}
+                style={styles.emptyBtn}
+              />
+            )}
           </View>
         ) : (
           <FlatList
-            data={history}
+            data={filteredHistory}
             keyExtractor={(item) => item.id}
             renderItem={renderItem}
             contentContainerStyle={styles.listContent}
@@ -174,11 +276,34 @@ export default function HistoryScreen({ navigation }) {
 const styles = StyleSheet.create({
   safeContainer: {
     flex: 1,
-    backgroundColor: COLORS.background,
   },
   container: {
     flex: 1,
     padding: SPACING.md,
+  },
+  filterSection: {
+    marginBottom: SPACING.md,
+  },
+  filterLabel: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+    marginBottom: 8,
+    textTransform: 'uppercase',
+  },
+  filterScroll: {
+    gap: 8,
+    paddingVertical: 2,
+  },
+  filterChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: BORDER_RADIUS.sm,
+    borderWidth: 1.2,
+  },
+  filterChipText: {
+    fontSize: 11,
+    fontFamily: 'IBM Plex Mono',
   },
   headerRow: {
     flexDirection: 'row',
@@ -188,14 +313,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.xs,
   },
   countText: {
-    ...TYPOGRAPHY.subtext,
+    fontSize: 11,
+    fontFamily: 'IBM Plex Mono',
     fontWeight: '700',
-    color: COLORS.textSecondary,
   },
   clearAllLink: {
-    ...TYPOGRAPHY.subtext,
+    fontSize: 11,
+    fontFamily: 'IBM Plex Mono',
     fontWeight: '600',
-    color: '#EF4444', // Minimal red for critical actions, but wait - let's stay simple, or standard text.
+    color: '#EF4444',
   },
   listContent: {
     paddingBottom: SPACING.xl,
@@ -204,7 +330,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: SPACING.md,
-    paddingRight: 0, // Enable delete button alignment
+    paddingRight: 0,
   },
   cardContent: {
     flex: 1,
@@ -216,48 +342,69 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: SPACING.sm,
+    flexWrap: 'wrap',
+    gap: 8,
   },
   dateText: {
-    ...TYPOGRAPHY.subtext,
-    color: COLORS.textMuted,
+    fontSize: 10,
+    fontFamily: 'IBM Plex Mono',
     fontWeight: '600',
   },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 6,
   },
   badge: {
-    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: COLORS.border,
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: BORDER_RADIUS.sm,
   },
   badgeText: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: 'bold',
-    color: COLORS.textSecondary,
+  },
+  resolvedBadge: {
+    borderWidth: 1,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: BORDER_RADIUS.sm,
+  },
+  resolvedBadgeText: {
+    fontSize: 9,
+    fontFamily: 'Orbitron',
+    fontWeight: '900',
   },
   decisionText: {
-    ...TYPOGRAPHY.body,
-    fontWeight: '600',
-    color: COLORS.textPrimary,
-    lineHeight: 20,
-    marginBottom: SPACING.sm,
+    fontSize: 13,
+    fontFamily: 'IBM Plex Mono',
+    fontWeight: '700',
+    lineHeight: 18,
+    marginBottom: SPACING.md,
+  },
+  cardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: SPACING.xs,
+  },
+  categoryLabel: {
+    fontSize: 9,
+    fontFamily: 'Orbitron',
+    fontWeight: '800',
   },
   tapPrompt: {
-    ...TYPOGRAPHY.subtext,
-    color: COLORS.accentBlue,
-    fontWeight: '600',
+    fontSize: 10,
+    fontFamily: 'Orbitron',
+    fontWeight: '800',
   },
   deleteBtn: {
-    width: 50,
+    width: 48,
     alignSelf: 'stretch',
     justifyContent: 'center',
     alignItems: 'center',
     borderLeftWidth: 1,
-    borderLeftColor: COLORS.divider,
   },
   deleteText: {
     fontSize: 16,
@@ -273,14 +420,14 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   },
   emptyTitle: {
-    ...TYPOGRAPHY.h2,
+    fontSize: 16,
     fontWeight: 'bold',
-    color: COLORS.textPrimary,
+    fontFamily: 'Orbitron',
     marginBottom: SPACING.sm,
   },
   emptySubtitle: {
-    ...TYPOGRAPHY.body,
-    color: COLORS.textSecondary,
+    fontSize: 13,
+    fontFamily: 'IBM Plex Mono',
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: SPACING.lg,

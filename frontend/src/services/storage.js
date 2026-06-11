@@ -4,6 +4,28 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const STORAGE_KEY = '@decision_simulator_history';
 
 /**
+ * Helper to classify decisions into categories based on keywords
+ */
+export const getCategoryFromText = (text) => {
+  if (!text) return 'general';
+  const clean = text.toLowerCase();
+  
+  const rules = {
+    career: ['job', 'offer', 'career', 'promote', 'promotion', 'resign', 'quit', 'leave', 'interview', 'work', 'office', 'boss', 'manager', 'study', 'class', 'school', 'university', 'college', 'exam', 'test', 'homework', 'learn', 'academic', 'degree', 'resume'],
+    finance: ['money', 'invest', 'investment', 'crypto', 'coin', 'stock', 'finance', 'financial', 'salary', 'buy', 'sell', 'cost', 'spend', 'price', 'bank', 'budget', 'rent', 'lease', 'debt', 'loan', 'mortgage', 'portfolio'],
+    relationships: ['marry', 'relationship', 'friend', 'friends', 'love', 'date', 'dating', 'partner', 'divorce', 'family', 'wife', 'husband', 'kid', 'kids', 'parent', 'parents', 'cat', 'dog', 'pet', 'animal', 'split', 'break up'],
+    health: ['stomach', 'pain', 'ache', 'sick', 'ill', 'fever', 'flu', 'cough', 'cold', 'health', 'medical', 'doctor', 'hospital', 'pill', 'diet', 'food', 'eat', 'drink', 'mushroom', 'symptom', 'injury', 'therapy', 'exercise', 'sleep']
+  };
+
+  for (const [cat, keywords] of Object.entries(rules)) {
+    if (keywords.some(word => clean.includes(word))) {
+      return cat;
+    }
+  }
+  return 'general';
+};
+
+/**
  * Get all saved simulations
  */
 export async function getSimulations() {
@@ -27,14 +49,20 @@ export async function saveSimulation(decision, result) {
   try {
     const list = await getSimulations();
     
+    // Auto-categorize if not returned by server
+    const category = result.category || getCategoryFromText(decision);
+    
     const newRecord = {
       id: Date.now().toString(),
       decision,
       risk: result.risk || 'medium',
       personality: result.personality || 'balanced',
       timestamp: new Date().toISOString(),
+      category,
+      outcome: null, // Initial outcome is null
       result: {
         ...result,
+        category,
         decision_summary: result.decision_summary || decision,
         scenarios: result.scenarios || [],
         key_factors_to_consider: result.key_factors_to_consider || [],
@@ -50,6 +78,32 @@ export async function saveSimulation(decision, result) {
     return newRecord;
   } catch (error) {
     console.error('Failed to save simulation to AsyncStorage:', error);
+    throw error;
+  }
+}
+
+/**
+ * Save / Update an outcome journal entry
+ */
+export async function saveSimulationOutcome(id, outcomeData) {
+  try {
+    const list = await getSimulations();
+    const index = list.findIndex(item => item.id === id);
+    
+    if (index === -1) {
+      throw new Error(`Simulation record with ID ${id} not found.`);
+    }
+    
+    list[index].outcome = {
+      text: outcomeData.text || '',
+      rating: outcomeData.rating || 'neutral', // 'positive' | 'neutral' | 'negative'
+      timestamp: new Date().toISOString(),
+    };
+    
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+    return list[index];
+  } catch (error) {
+    console.error(`Failed to save simulation outcome for ${id} in AsyncStorage:`, error);
     throw error;
   }
 }

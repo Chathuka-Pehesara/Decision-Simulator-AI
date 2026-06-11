@@ -13,6 +13,7 @@ import HomeScreen from './src/screens/HomeScreen';
 import ResultScreen from './src/screens/ResultScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
 import CompareScreen from './src/screens/CompareScreen';
+import DashboardScreen from './src/screens/DashboardScreen';
 
 // Theme Spacing & Colors
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
@@ -86,6 +87,13 @@ function MainAppContent() {
           component={CompareScreen} 
           options={{ 
             title: 'Decision Comparer',
+          }} 
+        />
+        <Stack.Screen 
+          name="Dashboard" 
+          component={DashboardScreen} 
+          options={{ 
+            title: 'Bias Dashboard',
           }} 
         />
       </Stack.Navigator>

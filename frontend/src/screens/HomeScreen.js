@@ -788,6 +788,28 @@ export default function HomeScreen({ navigation, route }) {
                 </Text>
               </TouchableOpacity>
             </View>
+
+            {/* Dashboard Button (Full-width Violet-themed Button) */}
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => navigation.navigate('Dashboard')}
+              style={[
+                styles.dashboardBtn,
+                {
+                  backgroundColor: theme.colors.surface,
+                  borderColor: theme.colors.border,
+                  borderWidth: themeName === 'accessibility' ? 2 : 1.5,
+                  marginTop: SPACING.md,
+                }
+              ]}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={{ fontSize: 13 }}>📊</Text>
+                <Text style={[styles.dashboardBtnText, { color: theme.colors.accentViolet, fontFamily: themeName === 'minimal' ? 'sans-serif' : 'Orbitron' }]}>
+                  Personal Bias Dashboard & Analytics
+                </Text>
+              </View>
+            </TouchableOpacity>
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -922,6 +944,22 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
   },
   compareBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  dashboardBtn: {
+    height: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: BORDER_RADIUS.md,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+  },
+  dashboardBtnText: {
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 1,

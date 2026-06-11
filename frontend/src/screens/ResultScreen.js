@@ -10,7 +10,8 @@ import {
   Alert,
   Animated,
   Platform,
-  TouchableOpacity
+  TouchableOpacity,
+  TextInput
 } from 'react-native';
 import Svg, { Polygon, Circle, Line, Text as SvgText, G } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
@@ -18,6 +19,7 @@ import Card from '../components/Card';
 import Button from '../components/Button';
 import { useTheme } from '../context/ThemeContext';
 import { SPACING, BORDER_RADIUS } from '../styles/theme';
+import { saveSimulationOutcome } from '../services/storage';
 
 // Dynamic Haptic Feedback Helper
 const triggerHaptic = async (riskLevel) => {
@@ -194,12 +196,269 @@ const SectionHeaderChip = ({ title, theme }) => (
 
 export default function ResultScreen({ route, navigation }) {
   const { theme, themeName } = useTheme();
-  const { simulation, decision } = route.params || {};
+  const { simulation, decision, recordId } = route.params || {};
 
   const [activeTimeline, setActiveTimeline] = useState("1"); // Horizons: 1, 3, 5, 10 years
   const [expandedNodes, setExpandedNodes] = useState({});
   const [zoomScale, setZoomScale] = useState(1.0);
-  
+
+  // Outcome Journal States
+  const [journalText, setJournalText] = useState('');
+  const [journalRating, setJournalRating] = useState('neutral');
+  const [isJournalSaved, setIsJournalSaved] = useState(false);
+
+  useEffect(() => {
+    if (simulation && simulation.outcome) {
+      setJournalText(simulation.outcome.text || '');
+      setJournalRating(simulation.outcome.rating || 'neutral');
+      setIsJournalSaved(true);
+    }
+  }, [simulation]);
+
+  const handleSaveJournal = async () => {
+    if (!recordId) return;
+    try {
+      await saveSimulationOutcome(recordId, {
+        text: journalText,
+        rating: journalRating
+      });
+      setIsJournalSaved(true);
+      Alert.alert('Outcome Logged', 'Your journal entry was saved successfully. Future simulations will be calibrated against this result!');
+      triggerHaptic('low');
+    } catch (err) {
+      console.error('[SAVE JOURNAL ERROR]', err);
+      Alert.alert('Journal Error', 'Failed to save outcome journal entry.');
+    }
+  };
+
+  const generateHTMLReport = () => {
+    const isDark = theme.isDark;
+    const bodyBg = isDark ? '#03050d' : '#f8fafc';
+    const textCol = isDark ? '#00e5ff' : '#0f172a';
+    const cardBg = isDark ? '#080c1c' : '#ffffff';
+    const borderCol = isDark ? 'rgba(0, 229, 255, 0.2)' : '#e2e8f0';
+    const subtextCol = isDark ? '#a855f7' : '#475569';
+    const textMuted = isDark ? '#587396' : '#94a3b8';
+    
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Decision Simulation Report - Decision Simulator AI</title>
+        <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+        <style>
+          body {
+            background-color: ${bodyBg};
+            color: ${textCol};
+            font-family: 'IBM Plex Mono', monospace;
+            padding: 40px;
+            max-width: 900px;
+            margin: auto;
+          }
+          h1, h2, h3 {
+            font-family: 'Orbitron', sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+          }
+          h1 {
+            color: ${textCol};
+            border-bottom: 2px solid ${borderCol};
+            padding-bottom: 12px;
+            margin-bottom: 30px;
+            font-size: 24px;
+            text-align: center;
+          }
+          .card {
+            background-color: ${cardBg};
+            border: 1.5px solid ${borderCol};
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+          }
+          .kpi-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 24px;
+          }
+          .kpi-card {
+            flex: 1;
+            text-align: center;
+            background-color: ${cardBg};
+            border: 1px solid ${borderCol};
+            padding: 16px;
+            border-radius: 8px;
+          }
+          .kpi-val {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 22px;
+            font-weight: 900;
+            color: ${textCol};
+            margin-bottom: 4px;
+          }
+          .kpi-lbl {
+            font-size: 9px;
+            color: ${textMuted};
+            text-transform: uppercase;
+          }
+          .scenario {
+            margin-bottom: 30px;
+            padding-left: 15px;
+            border-left: 4px solid ${subtextCol};
+          }
+          .scenario-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 16px;
+            font-weight: 900;
+            color: ${textCol};
+          }
+          .meta {
+            font-size: 11px;
+            color: ${subtextCol};
+            margin: 6px 0 12px 0;
+            text-transform: uppercase;
+          }
+          .desc {
+            font-size: 13px;
+            line-height: 1.6;
+            margin-bottom: 12px;
+          }
+          .reasoning {
+            background-color: ${isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)'};
+            padding: 12px 16px;
+            border-radius: 4px;
+            font-size: 11px;
+            line-height: 1.5;
+            color: ${isDark ? '#e2e8f0' : '#334155'};
+          }
+          .disclaimer {
+            font-size: 10px;
+            color: ${textMuted};
+            line-height: 1.5;
+            text-align: center;
+            margin-top: 50px;
+            border-top: 1px solid ${borderCol};
+            padding-top: 20px;
+          }
+          .print-btn {
+            background-color: ${textCol};
+            color: ${isDark ? '#03050d' : '#ffffff'};
+            font-family: 'Orbitron', sans-serif;
+            font-weight: bold;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            display: block;
+            margin: 20px auto;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+          }
+          @media print {
+            .print-btn { display: none; }
+            body { padding: 0; background-color: #ffffff; color: #000000; }
+            .card { border: 1px solid #e2e8f0; box-shadow: none; background: #ffffff; }
+            .kpi-card { border: 1px solid #e2e8f0; background: #ffffff; }
+            .scenario { border-left-color: #000000; }
+          }
+        </style>
+      </head>
+      <body>
+        <button class="print-btn" onclick="window.print()">Print Report / Save PDF</button>
+        
+        <h1>Decision Simulation Report</h1>
+        
+        <div class="card">
+          <div style="font-size: 10px; color: ${subtextCol}; font-weight: bold;">DECISION STATEMENT</div>
+          <div style="font-size: 16px; font-weight: bold; margin-top: 6px; font-style: italic;">"${decision}"</div>
+        </div>
+        
+        <div class="kpi-row">
+          <div class="kpi-card">
+            <div class="kpi-val">${biasScore}%</div>
+            <div class="kpi-lbl">Cognitive Bias Rating</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-val">${simulation.emotional_analysis?.intensity_score || 0}%</div>
+            <div class="kpi-lbl">Emotional Intensity</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-val">${simulation.confidence_assessment?.score || 0}%</div>
+            <div class="kpi-lbl">Confidence Level</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2 style="margin-top: 0; font-size: 14px; color: ${subtextCol};">Cognitive Distortion & Bias Analysis</h2>
+          <div class="desc">
+            <strong>Objective Reframe:</strong> "${cognitive_analysis.reframed_decision || 'N/A'}"
+          </div>
+          ${detectedBiases.map(b => `
+            <div style="margin-top: 12px; font-size: 12px;">
+              <strong>◆ ${b.name.toUpperCase()}</strong> (${b.severity} severity)
+              <div style="margin-top: 4px; font-size: 11px; color: ${isDark ? '#e2e8f0' : '#475569'};">${b.explanation}</div>
+            </div>
+          `).join('')}
+        </div>
+
+        <div class="card">
+          <h2 style="margin-top: 0; font-size: 14px; color: ${subtextCol};">Projected Futures</h2>
+          ${scenarios.map((sc, i) => {
+            const out = sc.temporal_outcomes?.[activeTimeline] || sc;
+            return `
+              <div class="scenario">
+                <div class="scenario-title">Path 0${i + 1}: ${sc.title}</div>
+                <div class="meta">Risk Level: ${out.risk_level} | Probability: ${out.probability}% | Mood: ${out.emotional_impact}</div>
+                <div class="desc">${out.description}</div>
+                <div class="reasoning"><strong>Behavioral Logic:</strong> ${sc.reasoning}</div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+
+        <div class="disclaimer">
+          ${final_note}
+        </div>
+      </body>
+      </html>
+    `;
+    return html;
+  };
+
+  const handleExportReport = async () => {
+    if (Platform.OS === 'web') {
+      try {
+        const html = generateHTMLReport();
+        const printWindow = window.open('', '_blank');
+        if (printWindow) {
+          printWindow.document.write(html);
+          printWindow.document.close();
+          setTimeout(() => {
+            printWindow.print();
+          }, 500);
+        }
+
+        const blob = new Blob([html], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Decision_Simulation_Report_${recordId || 'Draft'}.html`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        Alert.alert('Report Exported', 'A print-ready HTML report was generated and downloaded successfully.');
+      } catch (err) {
+        console.error('Failed to export HTML report:', err);
+        Alert.alert('Export Error', 'Could not compile and export HTML report.');
+      }
+    } else {
+      await handleShare();
+    }
+  };
+
   // Dynamic layout-based zoom calculations to prevent card scaling overlaps
   const scaledSize = (baseSize) => Math.max(4, Math.round(baseSize * zoomScale));
 
@@ -970,11 +1229,86 @@ export default function ResultScreen({ route, navigation }) {
           </Card>
         </View>
 
+        {/* Outcome Journal Section */}
+        {recordId && (
+          <View style={{ marginVertical: SPACING.xl }}>
+            <SectionHeaderChip title="📖 Outcome Journal" theme={theme} />
+            
+            <Card style={[styles.journalCard, { borderColor: theme.colors.border }]} outlined shadowed={false}>
+              <Text style={[styles.journalTitle, { color: theme.colors.textPrimary, fontFamily: theme.typography.h3.fontFamily }]}>
+                CLOSE THE FEEDBACK LOOP
+              </Text>
+              <Text style={[styles.journalSubtitle, { color: theme.colors.textMuted }]}>
+                How did this decision turn out in the real world? Log the outcome to calibrate your future simulations.
+              </Text>
+
+              {/* Rating Selector */}
+              <View style={styles.ratingRow}>
+                {[
+                  { label: '🔴 Negative', value: 'negative', color: theme.colors.riskHigh },
+                  { label: '🟡 Neutral', value: 'neutral', color: '#f59e0b' },
+                  { label: '🟢 Positive', value: 'positive', color: '#10b981' }
+                ].map((item) => {
+                  const isSelected = journalRating === item.value;
+                  return (
+                    <TouchableOpacity
+                      key={item.value}
+                      activeOpacity={0.8}
+                      onPress={() => setJournalRating(item.value)}
+                      style={[
+                        styles.ratingBtn,
+                        {
+                          borderColor: isSelected ? item.color : theme.colors.border,
+                          backgroundColor: isSelected ? item.color + '15' : theme.colors.surface,
+                          borderWidth: isSelected ? 2 : 1
+                        }
+                      ]}
+                    >
+                      <Text style={[styles.ratingBtnText, { color: isSelected ? item.color : theme.colors.textPrimary, fontWeight: isSelected ? 'bold' : '500' }]}>
+                        {item.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Text Area */}
+              <TextInput
+                style={[
+                  styles.journalInput,
+                  {
+                    borderColor: theme.colors.border,
+                    backgroundColor: themeName === 'accessibility' ? '#000000' : 'rgba(3, 5, 13, 0.6)',
+                    color: theme.colors.textPrimary,
+                  }
+                ]}
+                multiline
+                numberOfLines={3}
+                placeholder="Log actual outcomes here (e.g. accepted the role, work culture was great but long hours. Satisfactory decision overall.)"
+                placeholderTextColor={theme.colors.textMuted}
+                value={journalText}
+                onChangeText={setJournalText}
+                textAlignVertical="top"
+              />
+
+              <TouchableOpacity
+                activeOpacity={0.8}
+                style={[styles.saveJournalBtn, { backgroundColor: theme.colors.accentBlue }]}
+                onPress={handleSaveJournal}
+              >
+                <Text style={[styles.saveJournalBtnText, { color: themeName === 'sci-fi' ? '#03050d' : '#FFFFFF' }]}>
+                  {isJournalSaved ? 'UPDATE JOURNAL ENTRY' : 'SAVE JOURNAL ENTRY'}
+                </Text>
+              </TouchableOpacity>
+            </Card>
+          </View>
+        )}
+
         {/* Action Panel Footer */}
         <View style={styles.footerRow}>
           <TouchableOpacity
             activeOpacity={0.8}
-            onPress={handleShare}
+            onPress={handleExportReport}
             style={[styles.shareBtn, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
           >
             <Text style={[styles.shareBtnText, { color: theme.colors.textPrimary }]}>📤 EXPORT SIMULATION REPORT</Text>
@@ -1753,5 +2087,62 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '900',
     letterSpacing: 1.5,
+  },
+  journalCard: {
+    padding: SPACING.lg,
+    borderRadius: BORDER_RADIUS.lg,
+  },
+  journalTitle: {
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 1.5,
+    marginBottom: 4,
+    textTransform: 'uppercase',
+  },
+  journalSubtitle: {
+    fontFamily: 'IBM Plex Mono',
+    fontSize: 11,
+    lineHeight: 16,
+    marginBottom: SPACING.md,
+  },
+  ratingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginBottom: SPACING.md,
+  },
+  ratingBtn: {
+    flex: 1,
+    height: 40,
+    borderRadius: BORDER_RADIUS.md,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  ratingBtnText: {
+    fontFamily: 'IBM Plex Mono',
+    fontSize: 11,
+  },
+  journalInput: {
+    fontFamily: 'IBM Plex Mono',
+    minHeight: 80,
+    borderWidth: 1.2,
+    borderRadius: BORDER_RADIUS.md,
+    padding: SPACING.md,
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: SPACING.md,
+  },
+  saveJournalBtn: {
+    height: 44,
+    borderRadius: BORDER_RADIUS.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  saveJournalBtnText: {
+    fontFamily: 'Orbitron',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 1.2,
   },
 });

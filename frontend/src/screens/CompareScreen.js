@@ -6,15 +6,19 @@ import {
   View, 
   ScrollView, 
   SafeAreaView,
-  TouchableOpacity
+  TouchableOpacity,
+  Platform
 } from 'react-native';
 import Card from '../components/Card';
 import Dropdown from '../components/Dropdown';
 import Button from '../components/Button';
-import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY } from '../styles/theme';
+import { SPACING, BORDER_RADIUS } from '../styles/theme';
 import { getSimulations } from '../services/storage';
+import { useTheme } from '../context/ThemeContext';
 
 export default function CompareScreen({ navigation }) {
+  const { theme, themeName } = useTheme();
+  
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [idA, setIdA] = useState(null);
@@ -57,19 +61,46 @@ export default function CompareScreen({ navigation }) {
   const leadingA = getLeadingScenario(recordA);
   const leadingB = getLeadingScenario(recordB);
 
-  const renderGridRow = (label, valueA, valueB, highlight = false) => {
+  const getRiskColor = (risk) => {
+    if (!risk) return theme.colors.textPrimary;
+    const r = risk.toLowerCase();
+    if (r === 'low') return theme.colors.riskLow;
+    if (r === 'medium') return theme.colors.riskMedium;
+    if (r === 'high') return theme.colors.riskHigh;
+    return theme.colors.textPrimary;
+  };
+
+  const getOutcomeText = (rec) => {
+    if (!rec || !rec.outcome) return 'PENDING';
+    return rec.outcome.rating.toUpperCase();
+  };
+
+  const getOutcomeColor = (rec) => {
+    if (!rec || !rec.outcome) return theme.colors.textMuted;
+    return rec.outcome.rating === 'positive' ? '#10b981' : rec.outcome.rating === 'negative' ? theme.colors.riskHigh : theme.colors.textSecondary;
+  };
+
+  const renderGridRow = (label, valueA, valueB, highlight = false, colorA = null, colorB = null) => {
     return (
-      <View style={styles.gridRow}>
-        <View style={styles.gridLabelCell}>
-          <Text style={styles.gridRowLabel}>{label}</Text>
+      <View style={[styles.gridRow, { borderBottomColor: theme.colors.border }]}>
+        <View style={[styles.gridLabelCell, { borderRightColor: theme.colors.border }]}>
+          <Text style={[styles.gridRowLabel, { color: theme.colors.textSecondary }]}>{label}</Text>
         </View>
-        <View style={[styles.gridValueCell, highlight && styles.cellHighlight]}>
-          <Text style={[styles.gridValueText, highlight && styles.textHighlightBlue]}>
+        <View style={[styles.gridValueCell, { borderRightColor: theme.colors.border }, highlight && { backgroundColor: theme.colors.surface }]}>
+          <Text style={[
+            styles.gridValueText, 
+            { color: colorA || theme.colors.textPrimary }, 
+            highlight && { color: colorA || theme.colors.accentBlue, fontSize: 15, fontWeight: 'bold' }
+          ]}>
             {valueA}
           </Text>
         </View>
-        <View style={[styles.gridValueCell, highlight && styles.cellHighlight]}>
-          <Text style={[styles.gridValueText, highlight && styles.textHighlightGreen]}>
+        <View style={[styles.gridValueCell, { borderRightColor: theme.colors.border }, highlight && { backgroundColor: theme.colors.surface }]}>
+          <Text style={[
+            styles.gridValueText, 
+            { color: colorB || theme.colors.textPrimary }, 
+            highlight && { color: colorB || theme.colors.accentViolet, fontSize: 15, fontWeight: 'bold' }
+          ]}>
             {valueB}
           </Text>
         </View>
@@ -78,27 +109,39 @@ export default function CompareScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.safeContainer}>
+    <SafeAreaView style={[styles.safeContainer, { backgroundColor: theme.colors.background }]}>
       <ScrollView 
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
-          <Text style={styles.title}>Decision Comparer</Text>
-          <Text style={styles.subtitle}>
+          <Text style={[
+            styles.title, 
+            { 
+              color: theme.colors.accentBlue, 
+              fontFamily: themeName === 'minimal' ? 'sans-serif' : 'Orbitron',
+              fontWeight: '900',
+              fontSize: themeName === 'accessibility' ? 24 : 22,
+              letterSpacing: 1.5,
+              textTransform: 'uppercase'
+            }
+          ]}>
+            Decision Comparer
+          </Text>
+          <Text style={[styles.subtitle, { color: theme.colors.textMuted }]}>
             Contrast risk profiles and leading scenarios of two distinct options side-by-side.
           </Text>
         </View>
 
         {loading ? (
           <View style={styles.centeredState}>
-            <Text style={styles.loadingText}>Loading history...</Text>
+            <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>Loading history...</Text>
           </View>
         ) : history.length < 2 ? (
           <View style={styles.centeredState}>
             <Text style={styles.emptyIcon}>📊</Text>
-            <Text style={styles.emptyTitle}>Insufficient Simulations</Text>
-            <Text style={styles.emptySubtitle}>
+            <Text style={[styles.emptyTitle, { color: theme.colors.textPrimary }]}>Insufficient Simulations</Text>
+            <Text style={[styles.emptySubtitle, { color: theme.colors.textMuted }]}>
               You need at least 2 simulated decisions saved in your history to compare them side-by-side.
             </Text>
             <Button 
@@ -110,7 +153,17 @@ export default function CompareScreen({ navigation }) {
         ) : (
           <View style={styles.dashboardContainer}>
             {/* Pickers Card */}
-            <Card style={styles.pickersCard} outlined shadowed={false}>
+            <Card 
+              style={[
+                styles.pickersCard, 
+                { 
+                  backgroundColor: themeName === 'accessibility' ? '#000000' : theme.colors.surface, 
+                  borderColor: theme.colors.border 
+                }
+              ]} 
+              outlined 
+              shadowed={false}
+            >
               <Dropdown
                 label="First Choice (Option A)"
                 placeholder="Choose decision..."
@@ -129,34 +182,56 @@ export default function CompareScreen({ navigation }) {
 
             {/* Comparison Grid */}
             {recordA && recordB && (
-              <View style={styles.comparisonFrame}>
-                <View style={styles.gridHeaderRow}>
-                  <View style={styles.gridLabelCell} />
-                  <View style={styles.gridHeaderCell}>
-                    <Text style={styles.headerCellTitle}>Option A</Text>
+              <View style={[styles.comparisonFrame, { borderColor: theme.colors.border, backgroundColor: theme.colors.card }]}>
+                <View style={[styles.gridHeaderRow, { backgroundColor: theme.colors.surface, borderBottomColor: theme.colors.border }]}>
+                  <View style={[styles.gridLabelCell, { borderRightColor: theme.colors.border }]} />
+                  <View style={[styles.gridHeaderCell, { borderRightColor: theme.colors.border }]}>
+                    <Text style={[styles.headerCellTitle, { color: theme.colors.accentBlue }]}>Option A</Text>
+                    <Text numberOfLines={1} style={[styles.headerDecisionSubtitle, { color: theme.colors.textMuted }]}>
+                      {recordA.decision}
+                    </Text>
                   </View>
-                  <View style={styles.gridHeaderCell}>
-                    <Text style={[styles.headerCellTitle, styles.greenText]}>Option B</Text>
+                  <View style={[styles.gridHeaderCell, { borderRightColor: theme.colors.border }]}>
+                    <Text style={[styles.headerCellTitle, { color: theme.colors.accentViolet }]}>Option B</Text>
+                    <Text numberOfLines={1} style={[styles.headerDecisionSubtitle, { color: theme.colors.textMuted }]}>
+                      {recordB.decision}
+                    </Text>
                   </View>
                 </View>
 
                 {/* Decision Statements */}
-                <View style={styles.gridDecisionRow}>
-                  <View style={styles.gridLabelCell}>
-                    <Text style={styles.gridRowLabel}>Decision Statement</Text>
+                <View style={[styles.gridDecisionRow, { borderBottomColor: theme.colors.border }]}>
+                  <View style={[styles.gridLabelCell, { borderRightColor: theme.colors.border }]}>
+                    <Text style={[styles.gridRowLabel, { color: theme.colors.textSecondary }]}>Decision Statement</Text>
                   </View>
-                  <View style={styles.gridValueCell}>
-                    <Text style={styles.decisionStatement}>{recordA.decision}</Text>
+                  <View style={[styles.gridValueCell, { borderRightColor: theme.colors.border }]}>
+                    <Text style={[styles.decisionStatement, { color: theme.colors.textPrimary }]}>{recordA.decision}</Text>
                   </View>
-                  <View style={styles.gridValueCell}>
-                    <Text style={styles.decisionStatement}>{recordB.decision}</Text>
+                  <View style={[styles.gridValueCell, { borderRightColor: theme.colors.border }]}>
+                    <Text style={[styles.decisionStatement, { color: theme.colors.textPrimary }]}>{recordB.decision}</Text>
                   </View>
                 </View>
 
                 {/* Grid stats */}
-                {renderGridRow('Risk Rating', recordA.risk?.toUpperCase(), recordB.risk?.toUpperCase())}
+                {renderGridRow('Category', (recordA.category || 'general').toUpperCase(), (recordB.category || 'general').toUpperCase())}
+                {renderGridRow('Risk Rating', recordA.risk?.toUpperCase(), recordB.risk?.toUpperCase(), false, getRiskColor(recordA.risk), getRiskColor(recordB.risk))}
                 {renderGridRow('Lens Style', recordA.personality?.toUpperCase(), recordB.personality?.toUpperCase())}
                 
+                {renderGridRow(
+                  'Bias Index', 
+                  recordA.result?.cognitive_analysis?.bias_score !== undefined ? `${recordA.result.cognitive_analysis.bias_score}%` : 'N/A', 
+                  recordB.result?.cognitive_analysis?.bias_score !== undefined ? `${recordB.result.cognitive_analysis.bias_score}%` : 'N/A',
+                  false,
+                  recordA.result?.cognitive_analysis?.bias_score > 50 ? theme.colors.riskHigh : theme.colors.accentBlue,
+                  recordB.result?.cognitive_analysis?.bias_score > 50 ? theme.colors.riskHigh : theme.colors.accentViolet
+                )}
+
+                {renderGridRow(
+                  'Emotional Toll', 
+                  recordA.result?.emotional_analysis?.intensity_score !== undefined ? `${recordA.result.emotional_analysis.intensity_score}%` : 'N/A', 
+                  recordB.result?.emotional_analysis?.intensity_score !== undefined ? `${recordB.result.emotional_analysis.intensity_score}%` : 'N/A'
+                )}
+
                 {renderGridRow(
                   'Highest Prob.', 
                   leadingA ? `${leadingA.probability}%` : 'N/A', 
@@ -164,29 +239,38 @@ export default function CompareScreen({ navigation }) {
                   true
                 )}
 
+                {renderGridRow(
+                  'Journaled Outcome',
+                  getOutcomeText(recordA),
+                  getOutcomeText(recordB),
+                  false,
+                  getOutcomeColor(recordA),
+                  getOutcomeColor(recordB)
+                )}
+
                 {/* Leading Scenario */}
-                <View style={styles.gridDecisionRow}>
-                  <View style={styles.gridLabelCell}>
-                    <Text style={styles.gridRowLabel}>Leading Scenario</Text>
+                <View style={[styles.gridDecisionRow, { borderBottomColor: theme.colors.border }]}>
+                  <View style={[styles.gridLabelCell, { borderRightColor: theme.colors.border }]}>
+                    <Text style={[styles.gridRowLabel, { color: theme.colors.textSecondary }]}>Leading Scenario</Text>
                   </View>
-                  <View style={styles.gridValueCell}>
+                  <View style={[styles.gridValueCell, { borderRightColor: theme.colors.border }]}>
                     {leadingA ? (
                       <View>
-                        <Text style={styles.leadingScenarioTitle}>{leadingA.title}</Text>
-                        <Text style={styles.leadingScenarioDesc}>{leadingA.description}</Text>
+                        <Text style={[styles.leadingScenarioTitle, { color: theme.colors.accentBlue }]}>{leadingA.title}</Text>
+                        <Text style={[styles.leadingScenarioDesc, { color: theme.colors.textMuted }]}>{leadingA.description}</Text>
                       </View>
                     ) : (
-                      <Text style={styles.emptyText}>No scenario</Text>
+                      <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>No scenario</Text>
                     )}
                   </View>
-                  <View style={styles.gridValueCell}>
+                  <View style={[styles.gridValueCell, { borderRightColor: theme.colors.border }]}>
                     {leadingB ? (
                       <View>
-                        <Text style={styles.leadingScenarioTitle}>{leadingB.title}</Text>
-                        <Text style={styles.leadingScenarioDesc}>{leadingB.description}</Text>
+                        <Text style={[styles.leadingScenarioTitle, { color: theme.colors.accentViolet }]}>{leadingB.title}</Text>
+                        <Text style={[styles.leadingScenarioDesc, { color: theme.colors.textMuted }]}>{leadingB.description}</Text>
                       </View>
                     ) : (
-                      <Text style={styles.emptyText}>No scenario</Text>
+                      <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>No scenario</Text>
                     )}
                   </View>
                 </View>
@@ -195,17 +279,29 @@ export default function CompareScreen({ navigation }) {
 
             {/* Quick Summary review */}
             {recordA && recordB && leadingA && leadingB && (
-              <Card style={styles.reviewCard} outlined={false} shadowed={true}>
-                <Text style={styles.reviewTitle}>💡 Comparative Intelligence</Text>
+              <Card 
+                style={[
+                  styles.reviewCard, 
+                  { 
+                    backgroundColor: themeName === 'accessibility' ? '#000000' : theme.colors.surface, 
+                    borderColor: theme.colors.border 
+                  }
+                ]} 
+                outlined 
+                shadowed={false}
+              >
+                <Text style={[styles.reviewTitle, { color: theme.colors.textPrimary, fontFamily: themeName === 'minimal' ? 'sans-serif' : 'Orbitron' }]}>
+                  💡 Comparative Intelligence
+                </Text>
                 <View style={styles.reviewList}>
-                  <Text style={styles.reviewItem}>
-                    • **Option A** has a leading probability of **{leadingA.probability}%** with the outcome: *"{leadingA.title}"*.
+                  <Text style={[styles.reviewItem, { color: theme.colors.textSecondary }]}>
+                    • <Text style={{ fontWeight: 'bold', color: theme.colors.accentBlue }}>Option A</Text> has a leading probability of <Text style={{ fontWeight: 'bold', color: theme.colors.accentBlue }}>{leadingA.probability}%</Text> with the outcome: <Text style={{ fontStyle: 'italic', color: theme.colors.textPrimary }}>"{leadingA.title}"</Text>.
                   </Text>
-                  <Text style={styles.reviewItem}>
-                    • **Option B** has a leading probability of **{leadingB.probability}%** with the outcome: *"{leadingB.title}"*.
+                  <Text style={[styles.reviewItem, { color: theme.colors.textSecondary }]}>
+                    • <Text style={{ fontWeight: 'bold', color: theme.colors.accentViolet }}>Option B</Text> has a leading probability of <Text style={{ fontWeight: 'bold', color: theme.colors.accentViolet }}>{leadingB.probability}%</Text> with the outcome: <Text style={{ fontStyle: 'italic', color: theme.colors.textPrimary }}>"{leadingB.title}"</Text>.
                   </Text>
-                  <Text style={styles.reviewItem}>
-                    • Choose between **{recordA.risk?.toUpperCase()}** risk and **{recordB.risk?.toUpperCase()}** risk structures depending on your stability buffers.
+                  <Text style={[styles.reviewItem, { color: theme.colors.textSecondary }]}>
+                    • Choose between <Text style={{ fontWeight: 'bold', color: theme.colors.textPrimary }}>{recordA.risk?.toUpperCase()}</Text> risk and <Text style={{ fontWeight: 'bold', color: theme.colors.textPrimary }}>{recordB.risk?.toUpperCase()}</Text> risk structures depending on your stability buffers.
                   </Text>
                 </View>
               </Card>
@@ -220,7 +316,6 @@ export default function CompareScreen({ navigation }) {
 const styles = StyleSheet.create({
   safeContainer: {
     flex: 1,
-    backgroundColor: COLORS.background,
   },
   scrollContent: {
     padding: SPACING.md,
@@ -231,12 +326,11 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
   },
   title: {
-    ...TYPOGRAPHY.h1,
-    color: COLORS.textPrimary,
+    fontSize: 22,
   },
   subtitle: {
-    ...TYPOGRAPHY.body,
-    color: COLORS.textSecondary,
+    fontFamily: 'IBM Plex Mono',
+    fontSize: 12,
     marginTop: SPACING.xs,
     lineHeight: 20,
   },
@@ -247,22 +341,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.xl,
   },
   loadingText: {
-    ...TYPOGRAPHY.body,
-    color: COLORS.textSecondary,
+    fontFamily: 'Orbitron',
+    fontSize: 13,
+    fontWeight: '800',
   },
   emptyIcon: {
     fontSize: 48,
     marginBottom: SPACING.md,
   },
   emptyTitle: {
-    ...TYPOGRAPHY.h2,
-    fontWeight: 'bold',
-    color: COLORS.textPrimary,
+    fontFamily: 'Orbitron',
+    fontSize: 16,
+    fontWeight: '800',
     marginBottom: SPACING.sm,
   },
   emptySubtitle: {
-    ...TYPOGRAPHY.body,
-    color: COLORS.textSecondary,
+    fontFamily: 'IBM Plex Mono',
+    fontSize: 13,
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: SPACING.lg,
@@ -275,27 +370,21 @@ const styles = StyleSheet.create({
   },
   pickersCard: {
     padding: SPACING.md,
-    backgroundColor: COLORS.surface,
   },
   comparisonFrame: {
     borderWidth: 1.5,
-    borderColor: COLORS.border,
     borderRadius: BORDER_RADIUS.md,
-    backgroundColor: COLORS.card,
     overflow: 'hidden',
   },
   gridHeaderRow: {
     flexDirection: 'row',
-    backgroundColor: COLORS.surface,
     borderBottomWidth: 1.5,
-    borderBottomColor: COLORS.border,
   },
   gridLabelCell: {
     width: '28%',
     padding: SPACING.sm,
     justifyContent: 'center',
     borderRightWidth: 1,
-    borderRightColor: COLORS.border,
   },
   gridHeaderCell: {
     flex: 1,
@@ -303,97 +392,84 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRightWidth: 1,
-    borderRightColor: COLORS.border,
   },
   headerCellTitle: {
-    ...TYPOGRAPHY.h3,
-    fontSize: 14,
-    color: COLORS.accentBlue,
-    fontWeight: '700',
+    fontFamily: 'Orbitron',
+    fontSize: 12,
+    fontWeight: '900',
+    textTransform: 'uppercase',
   },
-  greenText: {
-    color: COLORS.accentGreen,
+  headerDecisionSubtitle: {
+    fontFamily: 'IBM Plex Mono',
+    fontSize: 9,
+    marginTop: 4,
+    textAlign: 'center',
+    maxWidth: '95%',
   },
   gridDecisionRow: {
     flexDirection: 'row',
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
   },
   decisionStatement: {
-    fontSize: 12,
-    color: COLORS.textPrimary,
+    fontFamily: 'IBM Plex Mono',
+    fontSize: 11,
     fontWeight: '600',
     lineHeight: 16,
   },
   gridRow: {
     flexDirection: 'row',
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
   },
   gridRowLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: COLORS.textSecondary,
+    fontFamily: 'Orbitron',
+    fontSize: 9,
+    fontWeight: '900',
     textTransform: 'uppercase',
-    letterSpacing: 0.3,
+    letterSpacing: 0.5,
   },
   gridValueCell: {
     flex: 1,
     padding: SPACING.sm,
     borderRightWidth: 1,
-    borderRightColor: COLORS.border,
     justifyContent: 'center',
   },
-  cellHighlight: {
-    backgroundColor: COLORS.surface,
-  },
   gridValueText: {
-    ...TYPOGRAPHY.body,
-    fontSize: 13,
+    fontFamily: 'IBM Plex Mono',
+    fontSize: 12,
     fontWeight: '600',
-    color: COLORS.textPrimary,
-  },
-  textHighlightBlue: {
-    color: COLORS.accentBlue,
-    fontSize: 15,
-    fontWeight: 'bold',
-  },
-  textHighlightGreen: {
-    color: COLORS.accentGreen,
-    fontSize: 15,
-    fontWeight: 'bold',
   },
   leadingScenarioTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
+    fontFamily: 'Orbitron',
+    fontSize: 11,
+    fontWeight: '800',
     marginBottom: 4,
+    textTransform: 'uppercase',
   },
   leadingScenarioDesc: {
+    fontFamily: 'IBM Plex Mono',
     fontSize: 11,
-    color: COLORS.textSecondary,
-    lineHeight: 15,
+    lineHeight: 16,
   },
   reviewCard: {
     padding: SPACING.md,
-    backgroundColor: '#FFFFFF',
   },
   reviewTitle: {
-    ...TYPOGRAPHY.h3,
-    color: COLORS.textPrimary,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
     marginBottom: SPACING.sm,
   },
   reviewList: {
     gap: SPACING.xs,
   },
   reviewItem: {
-    fontSize: 13,
-    color: COLORS.textSecondary,
+    fontFamily: 'IBM Plex Mono',
+    fontSize: 12,
     lineHeight: 18,
   },
   emptyText: {
-    fontSize: 12,
-    color: COLORS.textMuted,
+    fontFamily: 'IBM Plex Mono',
+    fontSize: 11,
   },
 });

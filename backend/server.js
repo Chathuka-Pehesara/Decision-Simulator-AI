@@ -306,7 +306,8 @@ function getModelDisplayName(modelString) {
     const provider = parts[0].toUpperCase();
     const model = parts.slice(1).join('/');
     
-    if (model.includes('llama-3.3-70b')) return 'Llama 3.3 (Groq)';
+    if (model.includes('llama-3.3-70b') && provider === 'GROQ') return 'Llama 3.3 (Groq)';
+    if (model.includes('llama-3.3-70b') && provider === 'OPENROUTER') return 'Llama 3.3 (OpenRouter)';
     if (model.includes('llama-3-8b')) return 'Llama 3 (OpenRouter)';
     if (model.includes('gemma-2-9b')) return 'Gemma 2 (OpenRouter)';
     if (model.includes('gemini-2.5-flash')) return 'Gemini 2.5 Flash';
@@ -650,7 +651,7 @@ app.post('/simulate', async (req, res) => {
   // Parse models from environment variables
   const primaryModelStr = process.env.PRIMARY_MODEL || 'gemini/gemini-2.5-flash';
   const model1Str = process.env.CONSENSUS_MODEL_1 || 'groq/llama-3.3-70b-versatile';
-  const model2Str = process.env.CONSENSUS_MODEL_2 || 'openrouter/meta-llama/llama-3-8b-instruct:free';
+  const model2Str = process.env.CONSENSUS_MODEL_2 || 'openrouter/meta-llama/llama-3.3-70b-instruct:free';
 
   const primaryConfig = resolveModelConfig(primaryModelStr);
   const model1Config = resolveModelConfig(model1Str);
@@ -886,7 +887,10 @@ INSTRUCTIONS:
    - Summarize their consensus into a single-sentence 'consensus_summary'.
 7. KEY FACTORS:
    - Provide exactly 4 concise key factors to monitor, limited to exactly 6-8 words each.
-8. CRITICAL LANGUAGE & TONE RULES:
+8. AUTO-CATEGORIZATION:
+   - Classify the decision statement into one of the following exact categories: "career", "finance", "relationships", "health", or "general".
+   - Place this classification in the 'category' field at the root of the JSON.
+9. CRITICAL LANGUAGE & TONE RULES:
    - Use objective, professional decision-science terminology (e.g. "temporal discounting", "marginal utility", "variance", "sustainability limit").
    - Strictly prohibit theatrical or dramatic AI words (e.g. "catastrophic", "dreaded collapse", "dopamine hit", "doom", "ruin").
    - Do NOT give direct advice or recommendations.
@@ -894,6 +898,7 @@ INSTRUCTIONS:
 OUTPUT FORMAT:
 Return response ONLY as a single valid JSON object following this structure:
 {
+  "category": "career",
   "decision_summary": "Standardized analytical decision query",
   "confidence_assessment": {
     "level": "Moderate Confidence",
@@ -1656,7 +1661,26 @@ function generateServerSimulation(decision, riskTolerance, personality) {
     cooldown_reframe: reframedDecision
   };
 
+  const getCategory = (text) => {
+    const clean = text.toLowerCase();
+    if (['job', 'offer', 'career', 'promote', 'resign', 'quit', 'interview', 'work', 'office', 'boss', 'manager', 'study', 'class', 'school', 'university', 'college', 'exam', 'test', 'homework', 'learn'].some(w => clean.includes(w))) {
+      return 'career';
+    }
+    if (['money', 'invest', 'investment', 'crypto', 'coin', 'stock', 'finance', 'salary', 'buy', 'sell', 'cost', 'spend', 'price', 'bank', 'budget', 'rent', 'lease'].some(w => clean.includes(w))) {
+      return 'finance';
+    }
+    if (['marry', 'relationship', 'friend', 'love', 'date', 'partner', 'divorce', 'family', 'wife', 'husband', 'kid', 'parent', 'cat', 'dog', 'pet', 'animal'].some(w => clean.includes(w))) {
+      return 'relationships';
+    }
+    if (['stomach', 'pain', 'ache', 'sick', 'ill', 'fever', 'flu', 'cough', 'cold', 'health', 'medical', 'doctor', 'hospital', 'pill', 'diet', 'food', 'eat', 'drink', 'mushroom', 'symptom'].some(w => clean.includes(w))) {
+      return 'health';
+    }
+    return 'general';
+  };
+  const category = getCategory(decision);
+
   return {
+    category: category,
     decision_summary: decision,
     confidence_assessment: {
       level: confidenceLevel,
