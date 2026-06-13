@@ -135,3 +135,119 @@ export async function clearAllSimulations() {
     throw error;
   }
 }
+
+// --- CUSTOM ADVISOR PERSONAS ---
+const ADVISORS_KEY = '@decision_simulator_custom_advisors';
+const PRESET_ADVISORS = [
+  { id: 'pres_1', name: 'Stoic Philosopher', riskAppetite: 'low', domainExpertise: 'Philosophy', description: 'Evaluates options through emotional control, path dependency, and long-term serenity.' },
+  { id: 'pres_2', name: 'Venture Capitalist', riskAppetite: 'high', domainExpertise: 'Finance', description: 'Focuses on capital leverage, scale, risk-mitigation, and compound utility gains.' }
+];
+
+export async function getCustomAdvisors() {
+  try {
+    const raw = await AsyncStorage.getItem(ADVISORS_KEY);
+    if (!raw) {
+      // Pre-populate with defaults
+      await AsyncStorage.setItem(ADVISORS_KEY, JSON.stringify(PRESET_ADVISORS));
+      return PRESET_ADVISORS;
+    }
+    return JSON.parse(raw);
+  } catch (err) {
+    console.error('Failed to load custom advisors:', err);
+    return PRESET_ADVISORS;
+  }
+}
+
+export async function saveCustomAdvisor(advisor) {
+  try {
+    const list = await getCustomAdvisors();
+    const newAdvisor = {
+      ...advisor,
+      id: advisor.id || `adv_${Date.now()}`
+    };
+    
+    const index = list.findIndex(a => a.id === newAdvisor.id);
+    if (index > -1) {
+      list[index] = newAdvisor;
+    } else {
+      list.push(newAdvisor);
+    }
+    
+    await AsyncStorage.setItem(ADVISORS_KEY, JSON.stringify(list));
+    return newAdvisor;
+  } catch (err) {
+    console.error('Failed to save advisor:', err);
+    throw err;
+  }
+}
+
+export async function deleteCustomAdvisor(id) {
+  try {
+    const list = await getCustomAdvisors();
+    const filtered = list.filter(a => a.id !== id);
+    await AsyncStorage.setItem(ADVISORS_KEY, JSON.stringify(filtered));
+    return filtered;
+  } catch (err) {
+    console.error('Failed to delete advisor:', err);
+    throw err;
+  }
+}
+
+// --- SUBSCRIPTION & BILLING SANDBOX CONTROLS ---
+const SUB_KEY = '@decision_simulator_subscription_status';
+
+export async function getSubscriptionTier() {
+  try {
+    const raw = await AsyncStorage.getItem(SUB_KEY);
+    const now = new Date();
+    const defaultSub = {
+      tier: 'free', // 'free' | 'pro' | 'teams'
+      count: 0,
+      resetDate: new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString()
+    };
+
+    if (!raw) {
+      await AsyncStorage.setItem(SUB_KEY, JSON.stringify(defaultSub));
+      return defaultSub;
+    }
+
+    const sub = JSON.parse(raw);
+    
+    // Check if billing cycle has expired, reset usage if needed
+    if (new Date(sub.resetDate) <= now) {
+      sub.count = 0;
+      sub.resetDate = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
+      await AsyncStorage.setItem(SUB_KEY, JSON.stringify(sub));
+    }
+    
+    return sub;
+  } catch (err) {
+    console.warn('Failed to load subscription status:', err);
+    return { tier: 'free', count: 0, resetDate: new Date().toISOString() };
+  }
+}
+
+export async function setSubscriptionTier(tier) {
+  try {
+    const sub = await getSubscriptionTier();
+    sub.tier = tier;
+    await AsyncStorage.setItem(SUB_KEY, JSON.stringify(sub));
+    return sub;
+  } catch (err) {
+    console.error('Failed to save subscription tier:', err);
+    throw err;
+  }
+}
+
+export async function incrementSimulationUsage() {
+  try {
+    const sub = await getSubscriptionTier();
+    sub.count = (sub.count || 0) + 1;
+    await AsyncStorage.setItem(SUB_KEY, JSON.stringify(sub));
+    return sub;
+  } catch (err) {
+    console.error('Failed to increment usage:', err);
+    throw err;
+  }
+}
+

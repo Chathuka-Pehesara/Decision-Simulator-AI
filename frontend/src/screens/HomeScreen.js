@@ -17,7 +17,7 @@ import Dropdown from '../components/Dropdown';
 import Card from '../components/Card';
 import { SPACING, BORDER_RADIUS } from '../styles/theme';
 import { simulateDecision, getSocraticQuestions, transcribeAudio } from '../services/api';
-import { saveSimulation } from '../services/storage';
+import { saveSimulation, getSubscriptionTier, getCustomAdvisors, incrementSimulationUsage } from '../services/storage';
 import { useTheme } from '../context/ThemeContext';
 import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
@@ -73,6 +73,22 @@ export default function HomeScreen({ navigation, route }) {
   const [loading, setLoading] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
 
+  // Subscription Billing states
+  const [subTier, setSubTier] = useState({ tier: 'free', count: 0 });
+  const [customAdvisorsList, setCustomAdvisorsList] = useState([]);
+  const [selectedAdvisors, setSelectedAdvisors] = useState([]);
+
+  // Load subscription tier and custom advisors on focus
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', async () => {
+      const sub = await getSubscriptionTier();
+      setSubTier(sub);
+      const list = await getCustomAdvisors();
+      setCustomAdvisorsList(list);
+    });
+    return unsubscribe;
+  }, [navigation]);
+
   // Socratic Mode States
   const [socraticMode, setSocraticMode] = useState(false);
   const [socraticStep, setSocraticStep] = useState(false);
@@ -118,6 +134,17 @@ export default function HomeScreen({ navigation, route }) {
   };
 
   const startRecording = async () => {
+    if (subTier.tier === 'free') {
+      Alert.alert(
+        'Voice Feature Restricted',
+        'AI Voice Dictation is a premium feature. Please upgrade to Pro or Teams to unlock voice-to-text dilemma descriptions!',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Upgrade Now', onPress: () => navigation.navigate('Subscription') }
+        ]
+      );
+      return;
+    }
     try {
       if (Platform.OS === 'web') {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -357,6 +384,18 @@ export default function HomeScreen({ navigation, route }) {
       return;
     }
 
+    if (subTier.tier === 'free' && (subTier.count || 0) >= 5) {
+      Alert.alert(
+        'Monthly Limit Exceeded',
+        'You have used all 5 free simulations for this month. Upgrade to Pro or Teams for unlimited simulations, custom advisors, and voice input!',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Upgrade Now', onPress: () => navigation.navigate('Subscription') }
+        ]
+      );
+      return;
+    }
+
     if (socraticMode) {
       setLoading(true);
       try {
@@ -383,7 +422,12 @@ export default function HomeScreen({ navigation, route }) {
   const runDirectSimulation = async (queryText) => {
     setLoading(true);
     try {
-      const result = await simulateDecision(queryText, risk, personality);
+      const result = await simulateDecision(queryText, risk, personality, selectedAdvisors);
+      
+      // Increment local count and refresh state
+      const updatedSub = await incrementSimulationUsage();
+      setSubTier(updatedSub);
+      
       const savedRecord = await saveSimulation(queryText, result);
       
       navigation.navigate('Result', { 
@@ -470,13 +514,41 @@ export default function HomeScreen({ navigation, route }) {
           <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
             {/* Header */}
             <View style={styles.header}>
-              <Text style={[
-                styles.title, 
-                theme.typography.h1,
-                Platform.OS === 'web' && themeName === 'sci-fi' && { animation: 'bioluminescentPulse 4s infinite ease-in-out' }
-              ]}>
-                Decision Simulator AI
-              </Text>
+              <View style={styles.headerTopRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[
+                    styles.title, 
+                    theme.typography.h1,
+                    Platform.OS === 'web' && themeName === 'sci-fi' && { animation: 'bioluminescentPulse 4s infinite ease-in-out' }
+                  ]}>
+                    Decision Simulator AI
+                  </Text>
+                </View>
+                
+                {/* Billing Badge */}
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => navigation.navigate('Subscription')}
+                  style={[
+                    styles.billingBadge,
+                    {
+                      borderColor: subTier.tier === 'free' ? theme.colors.accentBlue : subTier.tier === 'pro' ? theme.colors.accentViolet : '#fbbf24',
+                      backgroundColor: subTier.tier === 'free' ? theme.colors.accentBlueLight : 'rgba(168, 85, 247, 0.1)',
+                      borderWidth: themeName === 'accessibility' ? 2 : 1,
+                    }
+                  ]}
+                >
+                  <Text style={[
+                    styles.billingBadgeText,
+                    {
+                      color: subTier.tier === 'free' ? theme.colors.accentBlue : subTier.tier === 'pro' ? theme.colors.accentViolet : '#fbbf24',
+                    }
+                  ]}>
+                    {subTier.tier?.toUpperCase()} {subTier.tier === 'free' ? `(${subTier.count || 0}/5)` : ''}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              
               <Text style={[styles.subtitle, theme.typography.body]}>
                 Analyze potential pathways. Contrast probabilities. Map emotional impacts.
               </Text>
@@ -675,6 +747,100 @@ export default function HomeScreen({ navigation, route }) {
                     options={themeOptions}
                   />
 
+                  {/* Custom Boardroom Panel Selection */}
+                  <View style={styles.advisorsSection}>
+                    <View style={styles.advisorsHeaderRow}>
+                      <Text style={[
+                        styles.inputLabel,
+                        {
+                          color: theme.colors.textSecondary,
+                          fontFamily: themeName === 'minimal' ? 'sans-serif' : 'Orbitron',
+                          fontWeight: themeName === 'accessibility' ? '900' : '800',
+                        }
+                      ]}>
+                        Custom Boardroom Panel {subTier.tier === 'free' ? '🔒' : ''}
+                      </Text>
+                      <TouchableOpacity 
+                        onPress={() => {
+                          if (subTier.tier === 'free') {
+                            Alert.alert(
+                              'Premium Feature',
+                              'Custom boardroom advisor configurations are premium. Switch tier to manage advisors.',
+                              [
+                                { text: 'Cancel', style: 'cancel' },
+                                { text: 'Subscription Deck', onPress: () => navigation.navigate('Subscription') }
+                              ]
+                            );
+                          } else {
+                            navigation.navigate('Advisors');
+                          }
+                        }}
+                      >
+                        <Text style={[styles.manageAdvisorsText, { color: theme.colors.accentBlue }]}>
+                          {subTier.tier === 'free' ? 'Unlock Advisors' : '⚙ Manage Personas'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                    
+                    {customAdvisorsList.length === 0 ? (
+                      <Text style={[styles.noAdvisorsText, { color: theme.colors.textMuted }]}>
+                        No advisor personas saved yet.
+                      </Text>
+                    ) : (
+                      <ScrollView 
+                        horizontal 
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.advisorsChipScroll}
+                      >
+                        {customAdvisorsList.map((advisor) => {
+                          const isSelected = selectedAdvisors.some(a => a.id === advisor.id);
+                          const isFree = subTier.tier === 'free';
+                          return (
+                            <TouchableOpacity
+                              key={advisor.id}
+                              activeOpacity={0.8}
+                              onPress={() => {
+                                if (isFree) {
+                                  Alert.alert(
+                                    'Premium Advisors Locked',
+                                    'Custom boardroom advisor personas require a Pro or Teams subscription.',
+                                    [
+                                      { text: 'Cancel', style: 'cancel' },
+                                      { text: 'Upgrade Now', onPress: () => navigation.navigate('Subscription') }
+                                    ]
+                                  );
+                                } else {
+                                  if (isSelected) {
+                                    setSelectedAdvisors(prev => prev.filter(a => a.id !== advisor.id));
+                                  } else {
+                                    setSelectedAdvisors(prev => [...prev, advisor]);
+                                  }
+                                }
+                              }}
+                              style={[
+                                styles.advisorChip,
+                                {
+                                  borderColor: isSelected ? theme.colors.accentBlue : theme.colors.border,
+                                  backgroundColor: isSelected ? theme.colors.accentBlueLight : (themeName === 'accessibility' ? '#000000' : 'rgba(3, 5, 13, 0.6)'),
+                                  borderWidth: isSelected || themeName === 'accessibility' ? 2 : 1,
+                                  opacity: isFree ? 0.6 : 1,
+                                }
+                              ]}
+                            >
+                              <Text style={[
+                                styles.advisorChipText,
+                                { color: isSelected ? theme.colors.accentBlue : theme.colors.textPrimary }
+                              ]}>
+                                {isFree ? '🔒 ' : (isSelected ? '✓ ' : '◆ ')}
+                                {advisor.name} ({advisor.domainExpertise})
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </ScrollView>
+                    )}
+                  </View>
+
                   {/* Socratic Toggle Switch */}
                   <TouchableOpacity
                     activeOpacity={0.8}
@@ -807,6 +973,88 @@ export default function HomeScreen({ navigation, route }) {
                 <Text style={{ fontSize: 13 }}>📊</Text>
                 <Text style={[styles.dashboardBtnText, { color: theme.colors.accentViolet, fontFamily: themeName === 'minimal' ? 'sans-serif' : 'Orbitron' }]}>
                   Personal Bias Dashboard & Analytics
+                </Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* Collab Room Shortcut Button */}
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => {
+                if (subTier.tier === 'teams') {
+                  navigation.navigate('CollabRoom');
+                } else {
+                  Alert.alert(
+                    'Enterprise Feature Locked',
+                    'Collaborative Decision Rooms are exclusive to the Enterprise Teams tier. Co-simulate and align group consensus!',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: 'Upgrade to Teams', onPress: () => navigation.navigate('Subscription') }
+                    ]
+                  );
+                }
+              }}
+              style={[
+                styles.collabRoomBtn,
+                {
+                  backgroundColor: theme.colors.surface,
+                  borderColor: subTier.tier === 'teams' ? '#fbbf24' : theme.colors.border,
+                  borderWidth: themeName === 'accessibility' ? 2 : 1.5,
+                  marginTop: SPACING.md,
+                }
+              ]}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={{ fontSize: 13 }}>{subTier.tier === 'teams' ? '👥' : '🔒'}</Text>
+                <Text style={[
+                  styles.collabRoomBtnText, 
+                  { 
+                    color: subTier.tier === 'teams' ? '#fbbf24' : theme.colors.textMuted, 
+                    fontFamily: themeName === 'minimal' ? 'sans-serif' : 'Orbitron' 
+                  }
+                ]}>
+                  Collaborative co-simulation room
+                </Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* Developer Platform Button */}
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => {
+                if (subTier.tier === 'teams') {
+                  navigation.navigate('Platform');
+                } else {
+                  Alert.alert(
+                    'Developer APIs Locked',
+                    'Public API access and webhook integrations are exclusive to the Enterprise Teams tier.',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: 'Upgrade to Teams', onPress: () => navigation.navigate('Subscription') }
+                    ]
+                  );
+                }
+              }}
+              style={[
+                styles.collabRoomBtn,
+                {
+                  backgroundColor: theme.colors.surface,
+                  borderColor: theme.colors.border,
+                  borderWidth: themeName === 'accessibility' ? 2 : 1.5,
+                  marginTop: SPACING.md,
+                }
+              ]}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={{ fontSize: 13 }}>⚡</Text>
+                <Text style={[
+                  styles.collabRoomBtnText, 
+                  { 
+                    color: theme.colors.accentBlue, 
+                    fontFamily: themeName === 'minimal' ? 'sans-serif' : 'Orbitron' 
+                  }
+                ]}>
+                  Developer Platform & APIs
                 </Text>
               </View>
             </TouchableOpacity>
@@ -1081,5 +1329,77 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     borderWidth: 2,
+  },
+  headerTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+  },
+  billingBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: BORDER_RADIUS.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  billingBadgeText: {
+    fontFamily: 'Orbitron',
+    fontSize: 10,
+    fontWeight: '950',
+    letterSpacing: 0.5,
+  },
+  advisorsSection: {
+    marginTop: SPACING.md,
+    marginBottom: SPACING.md,
+  },
+  advisorsHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  manageAdvisorsText: {
+    fontFamily: 'IBM Plex Mono',
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+  noAdvisorsText: {
+    fontFamily: 'IBM Plex Mono',
+    fontSize: 12,
+    fontStyle: 'italic',
+    paddingVertical: 4,
+  },
+  advisorsChipScroll: {
+    paddingVertical: 4,
+    gap: 8,
+  },
+  advisorChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: BORDER_RADIUS.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  advisorChipText: {
+    fontFamily: 'IBM Plex Mono',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  collabRoomBtn: {
+    height: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: BORDER_RADIUS.md,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+  },
+  collabRoomBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
   },
 });

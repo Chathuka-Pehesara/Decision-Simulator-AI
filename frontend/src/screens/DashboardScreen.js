@@ -14,19 +14,26 @@ import Svg, { Path, Circle, Line, Text as SvgText, G } from 'react-native-svg';
 import Card from '../components/Card';
 import Button from '../components/Button';
 import { SPACING, BORDER_RADIUS } from '../styles/theme';
-import { getSimulations } from '../services/storage';
+import { getSimulations, getSubscriptionTier } from '../services/storage';
 import { useTheme } from '../context/ThemeContext';
 
 export default function DashboardScreen({ navigation }) {
   const { theme, themeName } = useTheme();
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [subTier, setSubTier] = useState({ tier: 'free', count: 0 });
+  const [activeTab, setActiveTab] = useState('personal'); // 'personal' | 'org'
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', async () => {
       setLoading(true);
       const data = await getSimulations();
       setHistory(data);
+      const sub = await getSubscriptionTier();
+      setSubTier(sub);
+      if (sub.tier !== 'teams') {
+        setActiveTab('personal');
+      }
       setLoading(false);
     });
     return unsubscribe;
@@ -195,235 +202,425 @@ export default function DashboardScreen({ navigation }) {
         showsVerticalScrollIndicator={false}
       >
         
-        {/* KPI Grid */}
-        <View style={styles.kpiGrid}>
-          {/* Card 1: Total */}
-          <Card style={[styles.kpiCard, { borderColor: theme.colors.border }]} outlined shadowed={false}>
-            <Text style={[styles.kpiValue, { color: theme.colors.textPrimary }]}>{totalSims}</Text>
-            <Text style={[styles.kpiLabel, { color: theme.colors.textMuted }]}>SIMULATIONS RUN</Text>
-          </Card>
-
-          {/* Card 2: Bias */}
-          <Card style={[styles.kpiCard, { borderColor: theme.colors.border }]} outlined shadowed={false}>
-            <Text style={[styles.kpiValue, { color: avgBias > 50 ? theme.colors.riskHigh : theme.colors.accentBlue }]}>{avgBias}%</Text>
-            <Text style={[styles.kpiLabel, { color: theme.colors.textMuted }]}>AVG BIAS INDEX</Text>
-          </Card>
-
-          {/* Card 3: Emotion */}
-          <Card style={[styles.kpiCard, { borderColor: theme.colors.border }]} outlined shadowed={false}>
-            <Text style={[styles.kpiValue, { color: theme.colors.accentViolet }]}>{avgEmotion}%</Text>
-            <Text style={[styles.kpiLabel, { color: theme.colors.textMuted }]}>AVG EMOTION TOLL</Text>
-          </Card>
-
-          {/* Card 4: Journal */}
-          <Card style={[styles.kpiCard, { borderColor: theme.colors.border }]} outlined shadowed={false}>
-            <Text style={[styles.kpiValue, { color: '#10b981' }]}>{totalJournaled}</Text>
-            <Text style={[styles.kpiLabel, { color: theme.colors.textMuted }]}>OUTCOMES LOGGED</Text>
-          </Card>
-        </View>
-
-        {/* Self-Improvement Alert Banner */}
-        <View style={[styles.improvementBanner, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
-          <Text style={[styles.improvementText, { color: improvementColor }]}>
-            {improvementMessage}
-          </Text>
-        </View>
-
-        {/* Bias Trend Section */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary, fontFamily: theme.typography.h3.fontFamily }]}>
-            📈 COGNITIVE BIAS TREND
-          </Text>
-          <Text style={[styles.sectionSubtitle, { color: theme.colors.textMuted }]}>
-            Stochastic tracing of your bias scores across your last 7 decisions
-          </Text>
-
-          <Card style={[styles.chartCard, { borderColor: theme.colors.border }]} outlined shadowed={false}>
-            {points.length > 0 ? (
-              <View style={styles.chartWrapper}>
-                <Svg width={chartWidth} height={chartHeight}>
-                  {/* Grid Lines */}
-                  {[0, 25, 50, 75, 100].map((val) => {
-                    const y = chartHeight - paddingY - (val * (chartHeight - 2 * paddingY)) / 100;
-                    return (
-                      <G key={val}>
-                        <Line 
-                          x1={paddingX} 
-                          y1={y} 
-                          x2={chartWidth - paddingX} 
-                          y2={y} 
-                          stroke={theme.colors.divider} 
-                          strokeWidth="1" 
-                          strokeDasharray="4, 4" 
-                        />
-                        <SvgText 
-                          x={paddingX - 8} 
-                          y={y + 3} 
-                          fill={theme.colors.textMuted} 
-                          fontSize="8" 
-                          textAnchor="end"
-                          fontFamily="IBM Plex Mono"
-                        >
-                          {val}%
-                        </SvgText>
-                      </G>
-                    );
-                  })}
-
-                  {/* Connecting Sparkline */}
-                  {svgPath !== '' && (
-                    <Path 
-                      d={svgPath} 
-                      fill="none" 
-                      stroke={getThemeDisplayColor(theme.colors.accentBlue)} 
-                      strokeWidth="2.5" 
-                    />
-                  )}
-
-                  {/* Dot Point Indicators */}
-                  {points.map((pt, i) => (
-                    <G key={i}>
-                      <Circle 
-                        cx={pt.x} 
-                        cy={pt.y} 
-                        r="4" 
-                        fill={theme.colors.background} 
-                        stroke={getThemeDisplayColor(theme.colors.accentBlue)} 
-                        strokeWidth="2" 
-                      />
-                      <SvgText 
-                        x={pt.x} 
-                        y={chartHeight - 4} 
-                        fill={theme.colors.textMuted} 
-                        fontSize="7" 
-                        textAnchor="middle"
-                        fontFamily="IBM Plex Mono"
-                      >
-                        {pt.date}
-                      </SvgText>
-                      <SvgText 
-                        x={pt.x} 
-                        y={pt.y - 8} 
-                        fill={getThemeDisplayColor(theme.colors.textPrimary)} 
-                        fontSize="8" 
-                        fontWeight="bold"
-                        textAnchor="middle"
-                        fontFamily="Orbitron"
-                      >
-                        {pt.score}%
-                      </SvgText>
-                    </G>
-                  ))}
-                </Svg>
-              </View>
-            ) : (
-              <View style={styles.chartEmpty}>
-                <Text style={{ color: theme.colors.textMuted }}>Plotting requires at least 1 saved data record.</Text>
-              </View>
-            )}
-          </Card>
-        </View>
-
-        {/* 60/40 Asymmetric Dashboard Detail Grid */}
-        <View style={[styles.detailGrid, { flexDirection: Platform.OS === 'web' ? 'row' : 'column' }]}>
+        {/* Segment Control */}
+        <View style={[styles.segmentControl, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => setActiveTab('personal')}
+            style={[
+              styles.segmentBtn,
+              activeTab === 'personal' && { backgroundColor: theme.colors.accentBlue }
+            ]}
+          >
+            <Text style={[
+              styles.segmentBtnText,
+              { color: activeTab === 'personal' ? (themeName === 'sci-fi' ? '#03050d' : '#FFFFFF') : theme.colors.textSecondary }
+            ]}>
+              Personal Analytics
+            </Text>
+          </TouchableOpacity>
           
-          {/* Left Block: Prone Biases (60% width) */}
-          <View style={{ flex: 1.5 }}>
-            <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary, fontFamily: theme.typography.h3.fontFamily, marginBottom: 8 }]}>
-              🧠 PRONE COGNITIVE FALLACIES
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => {
+              if (subTier.tier === 'teams') {
+                setActiveTab('org');
+              } else {
+                Alert.alert(
+                  'Enterprise Analytics Locked',
+                  'Organization-Level Analytics are exclusive to the Enterprise Teams tier. Co-simulate, track room consensus, and map team cognitive biases!',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Upgrade to Teams', onPress: () => navigation.navigate('Subscription') }
+                  ]
+                );
+              }
+            }}
+            style={[
+              styles.segmentBtn,
+              activeTab === 'org' && { backgroundColor: '#fbbf24' }
+            ]}
+          >
+            <Text style={[
+              styles.segmentBtnText,
+              { color: activeTab === 'org' ? '#03050d' : theme.colors.textMuted }
+            ]}>
+              {subTier.tier === 'teams' ? 'Organization Analytics' : '🔒 Org Analytics'}
             </Text>
-            <Text style={[styles.sectionSubtitle, { color: theme.colors.textMuted, marginBottom: 12 }]}>
-              Your most recurring cognitive biases and default heuristics
-            </Text>
-
-            <Card style={[styles.detailCard, { borderColor: theme.colors.border }]} outlined shadowed={false}>
-              {sortedBiases.length > 0 ? (
-                <View style={styles.progressBarList}>
-                  {sortedBiases.map((bias, i) => {
-                    const percentOfTotal = Math.round((bias.count / totalSims) * 100);
-                    return (
-                      <View key={bias.name} style={styles.progressRow}>
-                        <View style={styles.progressRowHeader}>
-                          <Text style={[styles.progressItemName, { color: theme.colors.textPrimary }]}>
-                            ◆ {bias.name}
-                          </Text>
-                          <Text style={[styles.progressItemVal, { color: theme.colors.accentBlue }]}>
-                            {bias.count} time{bias.count > 1 ? 's' : ''} ({percentOfTotal}%)
-                          </Text>
-                        </View>
-                        <View style={[styles.progressBarContainer, { backgroundColor: theme.colors.divider }]}>
-                          <View 
-                            style={[
-                              styles.progressBarFill, 
-                              { 
-                                width: `${percentOfTotal}%`, 
-                                backgroundColor: i === 0 ? theme.colors.accentBlue : i === 1 ? theme.colors.accentViolet : '#f59e0b'
-                              }
-                            ]} 
-                          />
-                        </View>
-                      </View>
-                    );
-                  })}
-                </View>
-              ) : (
-                <View style={styles.emptyDetailCard}>
-                  <Text style={{ color: theme.colors.textMuted, textAlign: 'center' }}>
-                    No recurring biases detected. Keep simulating complex decisions to evaluate trigger counts.
-                  </Text>
-                </View>
-              )}
-            </Card>
-          </View>
-
-          {/* Right Block: Trigger Topics (40% width) */}
-          <View style={{ flex: 1, marginLeft: Platform.OS === 'web' ? SPACING.lg : 0, marginTop: Platform.OS === 'web' ? 0 : SPACING.lg }}>
-            <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary, fontFamily: theme.typography.h3.fontFamily, marginBottom: 8 }]}>
-              🎯 BIAS TRIGGER TOPICS
-            </Text>
-            <Text style={[styles.sectionSubtitle, { color: theme.colors.textMuted, marginBottom: 12 }]}>
-              Average bias score segmented by decision categories
-            </Text>
-
-            <Card style={[styles.detailCard, { borderColor: theme.colors.border }]} outlined shadowed={false}>
-              {categoryBreakdown.length > 0 ? (
-                <View style={styles.progressBarList}>
-                  {categoryBreakdown.map((cat) => {
-                    return (
-                      <View key={cat.name} style={styles.progressRow}>
-                        <View style={styles.progressRowHeader}>
-                          <Text style={[styles.progressItemName, { color: theme.colors.textSecondary }]}>
-                            ▪ {cat.name.toUpperCase()} ({cat.count})
-                          </Text>
-                          <Text style={[styles.progressItemVal, { color: theme.colors.textPrimary }]}>
-                            {cat.avgScore}% Avg
-                          </Text>
-                        </View>
-                        <View style={[styles.progressBarContainer, { backgroundColor: theme.colors.divider }]}>
-                          <View 
-                            style={[
-                              styles.progressBarFill, 
-                              { 
-                                width: `${cat.avgScore}%`, 
-                                backgroundColor: cat.avgScore > 50 ? theme.colors.riskHigh : theme.colors.accentBlue
-                              }
-                            ]} 
-                          />
-                        </View>
-                      </View>
-                    );
-                  })}
-                </View>
-              ) : (
-                <View style={styles.emptyDetailCard}>
-                  <Text style={{ color: theme.colors.textMuted, textAlign: 'center' }}>
-                    No categorizations generated yet.
-                  </Text>
-                </View>
-              )}
-            </Card>
-          </View>
+          </TouchableOpacity>
         </View>
+
+        {activeTab === 'personal' ? (
+          <>
+            {/* KPI Grid */}
+            <View style={styles.kpiGrid}>
+              {/* Card 1: Total */}
+              <Card style={[styles.kpiCard, { borderColor: theme.colors.border }]} outlined shadowed={false}>
+                <Text style={[styles.kpiValue, { color: theme.colors.textPrimary }]}>{totalSims}</Text>
+                <Text style={[styles.kpiLabel, { color: theme.colors.textMuted }]}>SIMULATIONS RUN</Text>
+              </Card>
+
+              {/* Card 2: Bias */}
+              <Card style={[styles.kpiCard, { borderColor: theme.colors.border }]} outlined shadowed={false}>
+                <Text style={[styles.kpiValue, { color: avgBias > 50 ? theme.colors.riskHigh : theme.colors.accentBlue }]}>{avgBias}%</Text>
+                <Text style={[styles.kpiLabel, { color: theme.colors.textMuted }]}>AVG BIAS INDEX</Text>
+              </Card>
+
+              {/* Card 3: Emotion */}
+              <Card style={[styles.kpiCard, { borderColor: theme.colors.border }]} outlined shadowed={false}>
+                <Text style={[styles.kpiValue, { color: theme.colors.accentViolet }]}>{avgEmotion}%</Text>
+                <Text style={[styles.kpiLabel, { color: theme.colors.textMuted }]}>AVG EMOTION TOLL</Text>
+              </Card>
+
+              {/* Card 4: Journal */}
+              <Card style={[styles.kpiCard, { borderColor: theme.colors.border }]} outlined shadowed={false}>
+                <Text style={[styles.kpiValue, { color: '#10b981' }]}>{totalJournaled}</Text>
+                <Text style={[styles.kpiLabel, { color: theme.colors.textMuted }]}>OUTCOMES LOGGED</Text>
+              </Card>
+            </View>
+
+            {/* Self-Improvement Alert Banner */}
+            <View style={[styles.improvementBanner, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+              <Text style={[styles.improvementText, { color: improvementColor }]}>
+                {improvementMessage}
+              </Text>
+            </View>
+
+            {/* Bias Trend Section */}
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary, fontFamily: theme.typography.h3.fontFamily }]}>
+                📈 COGNITIVE BIAS TREND
+              </Text>
+              <Text style={[styles.sectionSubtitle, { color: theme.colors.textMuted }]}>
+                Stochastic tracing of your bias scores across your last 7 decisions
+              </Text>
+
+              <Card style={[styles.chartCard, { borderColor: theme.colors.border }]} outlined shadowed={false}>
+                {points.length > 0 ? (
+                  <View style={styles.chartWrapper}>
+                    <Svg width={chartWidth} height={chartHeight}>
+                      {/* Grid Lines */}
+                      {[0, 25, 50, 75, 100].map((val) => {
+                        const y = chartHeight - paddingY - (val * (chartHeight - 2 * paddingY)) / 100;
+                        return (
+                          <G key={val}>
+                            <Line 
+                              x1={paddingX} 
+                              y1={y} 
+                              x2={chartWidth - paddingX} 
+                              y2={y} 
+                              stroke={theme.colors.divider} 
+                              strokeWidth="1" 
+                              strokeDasharray="4, 4" 
+                            />
+                            <SvgText 
+                              x={paddingX - 8} 
+                              y={y + 3} 
+                              fill={theme.colors.textMuted} 
+                              fontSize="8" 
+                              textAnchor="end"
+                              fontFamily="IBM Plex Mono"
+                            >
+                              {val}%
+                            </SvgText>
+                          </G>
+                        );
+                      })}
+
+                      {/* Connecting Sparkline */}
+                      {svgPath !== '' && (
+                        <Path 
+                          d={svgPath} 
+                          fill="none" 
+                          stroke={getThemeDisplayColor(theme.colors.accentBlue)} 
+                          strokeWidth="2.5" 
+                        />
+                      )}
+
+                      {/* Dot Point Indicators */}
+                      {points.map((pt, i) => (
+                        <G key={i}>
+                          <Circle 
+                            cx={pt.x} 
+                            cy={pt.y} 
+                            r="4" 
+                            fill={theme.colors.background} 
+                            stroke={getThemeDisplayColor(theme.colors.accentBlue)} 
+                            strokeWidth="2" 
+                          />
+                          <SvgText 
+                            x={pt.x} 
+                            y={chartHeight - 4} 
+                            fill={theme.colors.textMuted} 
+                            fontSize="7" 
+                            textAnchor="middle"
+                            fontFamily="IBM Plex Mono"
+                          >
+                            {pt.date}
+                          </SvgText>
+                          <SvgText 
+                            x={pt.x} 
+                            y={pt.y - 8} 
+                            fill={getThemeDisplayColor(theme.colors.textPrimary)} 
+                            fontSize="8" 
+                            fontWeight="bold"
+                            textAnchor="middle"
+                            fontFamily="Orbitron"
+                          >
+                            {pt.score}%
+                          </SvgText>
+                        </G>
+                      ))}
+                    </Svg>
+                  </View>
+                ) : (
+                  <View style={styles.chartEmpty}>
+                    <Text style={{ color: theme.colors.textMuted }}>Plotting requires at least 1 saved data record.</Text>
+                  </View>
+                )}
+              </Card>
+            </View>
+
+            {/* 60/40 Asymmetric Dashboard Detail Grid */}
+            <View style={[styles.detailGrid, { flexDirection: Platform.OS === 'web' ? 'row' : 'column' }]}>
+              
+              {/* Left Block: Prone Biases (60% width) */}
+              <View style={{ flex: 1.5 }}>
+                <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary, fontFamily: theme.typography.h3.fontFamily, marginBottom: 8 }]}>
+                  🧠 PRONE COGNITIVE FALLACIES
+                </Text>
+                <Text style={[styles.sectionSubtitle, { color: theme.colors.textMuted, marginBottom: 12 }]}>
+                  Your most recurring cognitive biases and default heuristics
+                </Text>
+
+                <Card style={[styles.detailCard, { borderColor: theme.colors.border }]} outlined shadowed={false}>
+                  {sortedBiases.length > 0 ? (
+                    <View style={styles.progressBarList}>
+                      {sortedBiases.map((bias, i) => {
+                        const percentOfTotal = Math.round((bias.count / totalSims) * 100);
+                        return (
+                          <View key={bias.name} style={styles.progressRow}>
+                            <View style={styles.progressRowHeader}>
+                              <Text style={[styles.progressItemName, { color: theme.colors.textPrimary }]}>
+                                ◆ {bias.name}
+                              </Text>
+                              <Text style={[styles.progressItemVal, { color: theme.colors.accentBlue }]}>
+                                {bias.count} time{bias.count > 1 ? 's' : ''} ({percentOfTotal}%)
+                              </Text>
+                            </View>
+                            <View style={[styles.progressBarContainer, { backgroundColor: theme.colors.divider }]}>
+                              <View 
+                                style={[
+                                  styles.progressBarFill, 
+                                  { 
+                                    width: `${percentOfTotal}%`, 
+                                    backgroundColor: i === 0 ? theme.colors.accentBlue : i === 1 ? theme.colors.accentViolet : '#f59e0b'
+                                  }
+                                ]} 
+                              />
+                            </View>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  ) : (
+                    <View style={styles.emptyDetailCard}>
+                      <Text style={{ color: theme.colors.textMuted, textAlign: 'center' }}>
+                        No recurring biases detected. Keep simulating complex decisions to evaluate trigger counts.
+                      </Text>
+                    </View>
+                  )}
+                </Card>
+              </View>
+
+              {/* Right Block: Trigger Topics (40% width) */}
+              <View style={{ flex: 1, marginLeft: Platform.OS === 'web' ? SPACING.lg : 0, marginTop: Platform.OS === 'web' ? 0 : SPACING.lg }}>
+                <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary, fontFamily: theme.typography.h3.fontFamily, marginBottom: 8 }]}>
+                  🎯 BIAS TRIGGER TOPICS
+                </Text>
+                <Text style={[styles.sectionSubtitle, { color: theme.colors.textMuted, marginBottom: 12 }]}>
+                  Average bias score segmented by decision categories
+                </Text>
+
+                <Card style={[styles.detailCard, { borderColor: theme.colors.border }]} outlined shadowed={false}>
+                  {categoryBreakdown.length > 0 ? (
+                    <View style={styles.progressBarList}>
+                      {categoryBreakdown.map((cat) => {
+                        return (
+                          <View key={cat.name} style={styles.progressRow}>
+                            <View style={styles.progressRowHeader}>
+                              <Text style={[styles.progressItemName, { color: theme.colors.textSecondary }]}>
+                                ▪ {cat.name.toUpperCase()} ({cat.count})
+                              </Text>
+                              <Text style={[styles.progressItemVal, { color: theme.colors.textPrimary }]}>
+                                {cat.avgScore}% Avg
+                              </Text>
+                            </View>
+                            <View style={[styles.progressBarContainer, { backgroundColor: theme.colors.divider }]}>
+                              <View 
+                                style={[
+                                  styles.progressBarFill, 
+                                  { 
+                                    width: `${cat.avgScore}%`, 
+                                    backgroundColor: cat.avgScore > 50 ? theme.colors.riskHigh : theme.colors.accentBlue
+                                  }
+                                ]} 
+                              />
+                            </View>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  ) : (
+                    <View style={styles.emptyDetailCard}>
+                      <Text style={{ color: theme.colors.textMuted, textAlign: 'center' }}>
+                        No categorizations generated yet.
+                      </Text>
+                    </View>
+                  )}
+                </Card>
+              </View>
+            </View>
+          </>
+        ) : (
+          // ORGANIZATION ANALYTICS VIEW
+          <>
+            {/* KPI Grid */}
+            <View style={styles.kpiGrid}>
+              <Card style={[styles.kpiCard, { borderColor: '#fbbf24' }]} outlined shadowed={false}>
+                <Text style={[styles.kpiValue, { color: theme.colors.textPrimary }]}>84%</Text>
+                <Text style={[styles.kpiLabel, { color: theme.colors.textMuted }]}>TEAM CONSENSUS INDEX</Text>
+              </Card>
+
+              <Card style={[styles.kpiCard, { borderColor: theme.colors.border }]} outlined shadowed={false}>
+                <Text style={[styles.kpiValue, { color: theme.colors.accentBlue }]}>12</Text>
+                <Text style={[styles.kpiLabel, { color: theme.colors.textMuted }]}>ACTIVE COLLAB ROOMS</Text>
+              </Card>
+
+              <Card style={[styles.kpiCard, { borderColor: theme.colors.border }]} outlined shadowed={false}>
+                <Text style={[styles.kpiValue, { color: theme.colors.accentViolet }]}>14%</Text>
+                <Text style={[styles.kpiLabel, { color: theme.colors.textMuted }]}>ROOM SCORE VARIANCE</Text>
+              </Card>
+
+              <Card style={[styles.kpiCard, { borderColor: theme.colors.border }]} outlined shadowed={false}>
+                <Text style={[styles.kpiValue, { color: '#10b981' }]}>8</Text>
+                <Text style={[styles.kpiLabel, { color: theme.colors.textMuted }]}>ACTIVE ORG MEMBERS</Text>
+              </Card>
+            </View>
+
+            {/* Segment Breakdown */}
+            <View style={[styles.detailGrid, { flexDirection: Platform.OS === 'web' ? 'row' : 'column' }]}>
+              {/* Left Column: Bias & Stress levels segmented by categories */}
+              <View style={{ flex: 1.2 }}>
+                <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary, fontFamily: theme.typography.h3.fontFamily, marginBottom: 8 }]}>
+                  👥 TEAM DEPT BIAS & STRESS LEVELS
+                </Text>
+                <Text style={[styles.sectionSubtitle, { color: theme.colors.textMuted, marginBottom: 12 }]}>
+                  Cognitive variances segmented by corporate departments
+                </Text>
+
+                <Card style={[styles.detailCard, { borderColor: theme.colors.border }]} outlined shadowed={false}>
+                  <View style={styles.progressBarList}>
+                    {[
+                      { dept: 'Tech / R&D', bias: 42, stress: 38 },
+                      { dept: 'Marketing / Sales', bias: 55, stress: 62 },
+                      { dept: 'Product / Operations', bias: 48, stress: 50 },
+                      { dept: 'Executive / Strategy', bias: 68, stress: 72 }
+                    ].map((item) => (
+                      <View key={item.dept} style={{ marginBottom: 12 }}>
+                        <Text style={{ fontFamily: 'Orbitron', fontSize: 11, fontWeight: '750', color: theme.colors.textPrimary, marginBottom: 4 }}>
+                          ▪ {item.dept}
+                        </Text>
+                        <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+                          <Text style={{ fontFamily: 'IBM Plex Mono', fontSize: 10, color: theme.colors.textMuted, width: 70 }}>
+                            BIAS: {item.bias}%
+                          </Text>
+                          <View style={[{ flex: 1, height: 5, borderRadius: 2.5, backgroundColor: theme.colors.divider }, { overflow: 'hidden' }]}>
+                            <View style={{ height: '100%', width: `${item.bias}%`, backgroundColor: theme.colors.accentBlue }} />
+                          </View>
+                        </View>
+                        <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center', marginTop: 4 }}>
+                          <Text style={{ fontFamily: 'IBM Plex Mono', fontSize: 10, color: theme.colors.textMuted, width: 70 }}>
+                            STRESS: {item.stress}%
+                          </Text>
+                          <View style={[{ flex: 1, height: 5, borderRadius: 2.5, backgroundColor: theme.colors.divider }, { overflow: 'hidden' }]}>
+                            <View style={{ height: '100%', width: `${item.stress}%`, backgroundColor: theme.colors.accentViolet }} />
+                          </View>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                </Card>
+              </View>
+
+              {/* Right Column: Recent Activity Feed */}
+              <View style={{ flex: 1, marginLeft: Platform.OS === 'web' ? SPACING.lg : 0 }}>
+                <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary, fontFamily: theme.typography.h3.fontFamily, marginBottom: 8 }]}>
+                  ⚡ RECENT ORG FEED
+                </Text>
+                <Text style={[styles.sectionSubtitle, { color: theme.colors.textMuted, marginBottom: 12 }]}>
+                  Real-time events in group rooms
+                </Text>
+
+                <Card style={[styles.detailCard, { borderColor: theme.colors.border }]} outlined shadowed={false}>
+                  <View style={{ gap: 10 }}>
+                    {[
+                      "◆ Bob (Risk-taker) submitted votes for Path 2 in Room ROOM-CD1A2 (Alignment: 120%)",
+                      "◆ Alice (Balanced) finalized consensus in Room XT9P0 (92% Consensus)",
+                      "◆ Sarah (Analytical) created Room XT9P0",
+                      "◆ Dave (Emotional) joined Room ROOM-CD1A2",
+                      "◆ System completed Box-Muller simulation of Room ROOM-CD1A2"
+                    ].map((log, i) => (
+                      <Text key={i} style={{ fontFamily: 'IBM Plex Mono', fontSize: 10, color: theme.colors.textSecondary, lineHeight: 14 }}>
+                        {log}
+                      </Text>
+                    ))}
+                  </View>
+                </Card>
+              </View>
+            </View>
+
+            {/* Room History List */}
+            <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary, fontFamily: theme.typography.h3.fontFamily, marginBottom: 8 }]}>
+              📂 ACTIVE TEAMS SIMULATION ROOMS
+            </Text>
+            <Text style={[styles.sectionSubtitle, { color: theme.colors.textMuted, marginBottom: 12 }]}>
+              Consensus reports of co-simulation decision rooms
+            </Text>
+            
+            <View style={{ gap: SPACING.md, marginBottom: SPACING.lg }}>
+              {[
+                { code: 'XT9P0', host: 'Sarah', desc: 'Should we hire a dedicated compliance lead?', voters: 5, consensus: 92 },
+                { code: 'CD1A2', host: 'Alice', desc: 'Should we migrate our database to serverless?', voters: 4, consensus: 88 },
+                { code: 'KF3B1', host: 'Bob', desc: 'Should we pivot marketing budget entirely to video?', voters: 3, consensus: 62 }
+              ].map((room) => (
+                <Card key={room.code} style={{ padding: SPACING.md, borderColor: theme.colors.border }} outlined shadowed={false}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <Text style={{ fontFamily: 'Orbitron', fontSize: 12, fontWeight: '900', color: '#fbbf24' }}>
+                      ROOM-{room.code}
+                    </Text>
+                    <View style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: BORDER_RADIUS.sm, borderWidth: 1, borderColor: theme.colors.accentBlue }}>
+                      <Text style={{ fontFamily: 'IBM Plex Mono', fontSize: 9, color: theme.colors.accentBlue, fontWeight: 'bold' }}>
+                        {room.consensus}% CONSENSUS
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={{ fontFamily: 'IBM Plex Mono', fontSize: 13, color: theme.colors.textPrimary, marginBottom: 8, fontStyle: 'italic' }}>
+                    "{room.desc}"
+                  </Text>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 0.5, borderTopColor: theme.colors.divider, paddingTop: 6 }}>
+                    <Text style={{ fontFamily: 'IBM Plex Mono', fontSize: 10, color: theme.colors.textMuted }}>
+                      Host: {room.host}
+                    </Text>
+                    <Text style={{ fontFamily: 'IBM Plex Mono', fontSize: 10, color: theme.colors.textMuted }}>
+                      Voters: {room.voters} participants
+                    </Text>
+                  </View>
+                </Card>
+              ))}
+            </View>
+          </>
+        )}
 
         {/* Back navigation buttons */}
         <TouchableOpacity
@@ -604,5 +801,29 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '900',
     letterSpacing: 1.5,
+  },
+  segmentControl: {
+    flexDirection: 'row',
+    height: 48,
+    borderRadius: BORDER_RADIUS.md,
+    borderWidth: 1.5,
+    padding: 4,
+    marginBottom: SPACING.lg,
+  },
+  segmentBtn: {
+    flex: 1,
+    borderRadius: BORDER_RADIUS.sm,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  segmentBtnText: {
+    fontFamily: 'Orbitron',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  orgDivider: {
+    height: 1,
+    marginVertical: SPACING.md,
   },
 });

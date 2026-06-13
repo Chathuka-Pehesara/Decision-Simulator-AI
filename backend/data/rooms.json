@@ -1,0 +1,1817 @@
+{
+  "KXQXV": {
+    "code": "KXQXV",
+    "decision": "Should the team migrate the more database to a distributed more?",
+    "risk": "high",
+    "personality": "analytical",
+    "hostId": "usr_1781205903369",
+    "hostName": "Alice",
+    "scenarios": [
+      {
+        "title": "Successful Phased Migration",
+        "temporal_outcomes": {
+          "1": {
+            "description": "Initial migration phases are completed, encountering expected technical challenges and temporary performance dips. Core services begin operating on the new distributed architecture.",
+            "probability": 60,
+            "risk_level": "high",
+            "emotional_impact": "Stressed",
+            "radar_metrics": {
+              "risk": 70,
+              "reward": 40,
+              "time_cost": 80,
+              "emotional_toll": 75,
+              "reversibility": 30
+            },
+            "monte_carlo_distribution": [
+              27,
+              115,
+              347,
+              848,
+              1570,
+              2159,
+              2145,
+              1478,
+              861,
+              450
+            ]
+          },
+          "3": {
+            "description": "The distributed system stabilizes, demonstrating significant performance gains and enhanced scalability. New features leveraging the architecture are successfully deployed.",
+            "probability": 70,
+            "risk_level": "medium",
+            "emotional_impact": "Confident",
+            "radar_metrics": {
+              "risk": 45,
+              "reward": 70,
+              "time_cost": 60,
+              "emotional_toll": 40,
+              "reversibility": 20
+            },
+            "monte_carlo_distribution": [
+              3,
+              26,
+              106,
+              368,
+              868,
+              1530,
+              2145,
+              2087,
+              1521,
+              1346
+            ]
+          },
+          "5": {
+            "description": "The distributed database provides a robust foundation, enabling rapid innovation and a clear competitive advantage. Operational costs related to scaling are optimized.",
+            "probability": 80,
+            "risk_level": "low",
+            "emotional_impact": "Satisfied",
+            "radar_metrics": {
+              "risk": 20,
+              "reward": 85,
+              "time_cost": 40,
+              "emotional_toll": 20,
+              "reversibility": 10
+            },
+            "monte_carlo_distribution": [
+              0,
+              5,
+              27,
+              110,
+              340,
+              850,
+              1551,
+              2117,
+              2104,
+              2896
+            ]
+          },
+          "10": {
+            "description": "The distributed architecture is fully mature, serving as a strategic asset for long-term growth and market leadership. It supports advanced data analytics and global expansion.",
+            "probability": 85,
+            "risk_level": "low",
+            "emotional_impact": "Strategic",
+            "radar_metrics": {
+              "risk": 10,
+              "reward": 95,
+              "time_cost": 20,
+              "emotional_toll": 10,
+              "reversibility": 5
+            },
+            "monte_carlo_distribution": [
+              0,
+              1,
+              15,
+              52,
+              192,
+              568,
+              1148,
+              1936,
+              2196,
+              3892
+            ]
+          }
+        },
+        "consequence_tree": {
+          "title": "Initiate Distributed Database Migration",
+          "probability": 100,
+          "branches": [
+            {
+              "title": "Successful Phased Implementation",
+              "probability": 70,
+              "branches": [
+                {
+                  "title": "Enhanced Scalability & Performance",
+                  "probability": 80,
+                  "branches": [
+                    {
+                      "title": "Increased Market Share",
+                      "probability": 60,
+                      "branches": []
+                    },
+                    {
+                      "title": "Reduced Operational Costs",
+                      "probability": 40,
+                      "branches": []
+                    }
+                  ]
+                },
+                {
+                  "title": "Integration Challenges Overcome",
+                  "probability": 20,
+                  "branches": []
+                }
+              ]
+            },
+            {
+              "title": "Significant Technical Debt & Delays",
+              "probability": 30,
+              "branches": [
+                {
+                  "title": "Project Scope Creep",
+                  "probability": 70,
+                  "branches": []
+                },
+                {
+                  "title": "Resource Exhaustion",
+                  "probability": 30,
+                  "branches": []
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "title": "Partial Migration with Hybrid Architecture",
+        "temporal_outcomes": {
+          "1": {
+            "description": "Critical database components are distributed, while legacy systems remain, creating a complex hybrid environment. Initial integration efforts consume significant resources.",
+            "probability": 70,
+            "risk_level": "medium",
+            "emotional_impact": "Cautious",
+            "radar_metrics": {
+              "risk": 55,
+              "reward": 35,
+              "time_cost": 70,
+              "emotional_toll": 60,
+              "reversibility": 50
+            },
+            "monte_carlo_distribution": [
+              6,
+              35,
+              95,
+              336,
+              822,
+              1631,
+              2057,
+              2084,
+              1562,
+              1372
+            ]
+          },
+          "3": {
+            "description": "The hybrid model achieves stability, delivering some benefits in specific areas, but overall system complexity and integration overhead persist. Scalability is uneven.",
+            "probability": 75,
+            "risk_level": "medium",
+            "emotional_impact": "Pragmatic",
+            "radar_metrics": {
+              "risk": 50,
+              "reward": 50,
+              "time_cost": 65,
+              "emotional_toll": 55,
+              "reversibility": 40
+            },
+            "monte_carlo_distribution": [
+              2,
+              17,
+              43,
+              217,
+              564,
+              1170,
+              1825,
+              2207,
+              1878,
+              2077
+            ]
+          },
+          "5": {
+            "description": "Scalability and performance are increasingly limited by the legacy components, leading to accumulating technical debt. Innovation is hampered by the need to maintain two distinct systems.",
+            "probability": 65,
+            "risk_level": "high",
+            "emotional_impact": "Frustrated",
+            "radar_metrics": {
+              "risk": 70,
+              "reward": 40,
+              "time_cost": 75,
+              "emotional_toll": 70,
+              "reversibility": 25
+            },
+            "monte_carlo_distribution": [
+              10,
+              52,
+              204,
+              545,
+              1156,
+              1894,
+              2190,
+              1902,
+              1204,
+              843
+            ]
+          },
+          "10": {
+            "description": "The hybrid architecture becomes a significant bottleneck, requiring a full re-architecture under pressure to remain competitive. Operational costs escalate due to complexity.",
+            "probability": 50,
+            "risk_level": "high",
+            "emotional_impact": "Regretful",
+            "radar_metrics": {
+              "risk": 85,
+              "reward": 20,
+              "time_cost": 90,
+              "emotional_toll": 80,
+              "reversibility": 10
+            },
+            "monte_carlo_distribution": [
+              151,
+              372,
+              830,
+              1551,
+              2109,
+              2073,
+              1563,
+              843,
+              377,
+              131
+            ]
+          }
+        },
+        "consequence_tree": {
+          "title": "Implement Hybrid Database Architecture",
+          "probability": 100,
+          "branches": [
+            {
+              "title": "Stable Coexistence of Systems",
+              "probability": 60,
+              "branches": [
+                {
+                  "title": "Moderate Performance Gains",
+                  "probability": 70,
+                  "branches": [
+                    {
+                      "title": "Sustained Business Operations",
+                      "probability": 80,
+                      "branches": []
+                    },
+                    {
+                      "title": "Limited Future Innovation",
+                      "probability": 20,
+                      "branches": []
+                    }
+                  ]
+                },
+                {
+                  "title": "Increased Operational Complexity",
+                  "probability": 30,
+                  "branches": []
+                }
+              ]
+            },
+            {
+              "title": "Unmanageable Integration Overhead",
+              "probability": 40,
+              "branches": [
+                {
+                  "title": "System Instability",
+                  "probability": 60,
+                  "branches": []
+                },
+                {
+                  "title": "Accelerated Technical Debt",
+                  "probability": 40,
+                  "branches": []
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "title": "Maintain Current System with Optimization",
+        "temporal_outcomes": {
+          "1": {
+            "description": "Existing database is optimized, leading to immediate cost savings and incremental performance improvements. No major architectural changes are pursued.",
+            "probability": 80,
+            "risk_level": "low",
+            "emotional_impact": "Relieved",
+            "radar_metrics": {
+              "risk": 20,
+              "reward": 30,
+              "time_cost": 30,
+              "emotional_toll": 20,
+              "reversibility": 90
+            },
+            "monte_carlo_distribution": [
+              1,
+              6,
+              20,
+              107,
+              340,
+              834,
+              1547,
+              2140,
+              2059,
+              2946
+            ]
+          },
+          "3": {
+            "description": "Scalability limits of the current system begin to be approached, leading to increasing operational costs for maintenance and workarounds. Performance gains plateau.",
+            "probability": 60,
+            "risk_level": "medium",
+            "emotional_impact": "Concerned",
+            "radar_metrics": {
+              "risk": 40,
+              "reward": 25,
+              "time_cost": 45,
+              "emotional_toll": 40,
+              "reversibility": 70
+            },
+            "monte_carlo_distribution": [
+              31,
+              105,
+              364,
+              864,
+              1539,
+              2145,
+              2103,
+              1538,
+              850,
+              461
+            ]
+          },
+          "5": {
+            "description": "The database becomes a significant bottleneck, hindering the development of new features and impacting user experience. Competitive disadvantage begins to manifest.",
+            "probability": 40,
+            "risk_level": "high",
+            "emotional_impact": "Anxious",
+            "radar_metrics": {
+              "risk": 70,
+              "reward": 15,
+              "time_cost": 60,
+              "emotional_toll": 65,
+              "reversibility": 40
+            },
+            "monte_carlo_distribution": [
+              501,
+              788,
+              1601,
+              2111,
+              2146,
+              1540,
+              837,
+              362,
+              88,
+              26
+            ]
+          },
+          "10": {
+            "description": "The accumulated technical debt necessitates a forced, urgent re-platforming effort, incurring higher costs and significant business disruption. Market position is severely eroded.",
+            "probability": 20,
+            "risk_level": "high",
+            "emotional_impact": "Urgent",
+            "radar_metrics": {
+              "risk": 90,
+              "reward": 5,
+              "time_cost": 95,
+              "emotional_toll": 90,
+              "reversibility": 10
+            },
+            "monte_carlo_distribution": [
+              2907,
+              2153,
+              2097,
+              1542,
+              819,
+              332,
+              119,
+              24,
+              7,
+              0
+            ]
+          }
+        },
+        "consequence_tree": {
+          "title": "Optimize Existing Database Infrastructure",
+          "probability": 100,
+          "branches": [
+            {
+              "title": "Short-Term Performance Improvements",
+              "probability": 70,
+              "branches": [
+                {
+                  "title": "Extended System Lifespan",
+                  "probability": 80,
+                  "branches": [
+                    {
+                      "title": "Deferred Capital Expenditure",
+                      "probability": 70,
+                      "branches": []
+                    },
+                    {
+                      "title": "Missed Scalability Opportunities",
+                      "probability": 30,
+                      "branches": []
+                    }
+                  ]
+                },
+                {
+                  "title": "Resource Constraints Emerge",
+                  "probability": 20,
+                  "branches": []
+                }
+              ]
+            },
+            {
+              "title": "Rapid Scalability Limits Reached",
+              "probability": 30,
+              "branches": [
+                {
+                  "title": "Performance Degradation",
+                  "probability": 70,
+                  "branches": []
+                },
+                {
+                  "title": "Competitive Disadvantage",
+                  "probability": 30,
+                  "branches": []
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "scenariosMeta": {
+      "confidence_assessment": {
+        "level": "Moderate Confidence",
+        "score": 65,
+        "limitations": [
+          "Absence of current database architecture details",
+          "Lack of defined performance metrics for 'distributed'",
+          "Unspecified team resource availability and skill sets"
+        ]
+      },
+      "cognitive_analysis": {
+        "bias_score": 20,
+        "detected_biases": [
+          {
+            "name": "Framing Effect",
+            "severity": "low",
+            "explanation": "The decision is framed as a direct 'should we' question, potentially limiting the exploration of alternative solutions or the 'do nothing' option."
+          },
+          {
+            "name": "Ambiguity Effect",
+            "severity": "medium",
+            "explanation": "The vague phrasing 'the more database' and 'a distributed more' introduces significant ambiguity, potentially leading to decisions based on incomplete or unclear information rather than comprehensive data."
+          }
+        ],
+        "reframed_decision": "Conduct a comprehensive feasibility study and cost-benefit analysis for transitioning the current database system to a distributed architecture, considering all viable alternatives."
+      },
+      "boardroom_debate": {
+        "advisors": [
+          {
+            "name": "Logical & Behavioral Perspective",
+            "role": "Analyzes cognitive patterns, immediate impulses, and emotional framing"
+          },
+          {
+            "name": "Risk & Sustainability Perspective",
+            "role": "Analyzes long-term viability, resource preservation, and environmental trade-offs"
+          }
+        ],
+        "debate_transcript": [
+          {
+            "speaker": "Logical & Behavioral Perspective",
+            "message": "The decision framing as a 'should' rather than an 'evaluate' may prematurely narrow the solution space, potentially overlooking critical data points or alternative strategic pathways."
+          },
+          {
+            "speaker": "Risk & Sustainability Perspective",
+            "message": "A high-risk tolerance coupled with an analytical lens necessitates a thorough assessment of long-term system viability and resource allocation, ensuring the proposed migration aligns with future operational sustainability."
+          }
+        ],
+        "consensus_summary": "A data-driven evaluation of distributed database migration is warranted, balancing potential gains against long-term system sustainability and resource implications."
+      },
+      "final_note": "This simulation provides a multi-faceted analytical framework for decision evaluation, not a prescriptive recommendation."
+    },
+    "participants": [
+      {
+        "id": "usr_1781205903369",
+        "name": "Alice",
+        "personality": "analytical",
+        "isHost": true
+      },
+      {
+        "id": "usr_1781205903379",
+        "name": "Bob",
+        "personality": "risk-taker",
+        "isHost": false
+      }
+    ],
+    "votes": {
+      "usr_1781205903379": [
+        {
+          "scenarioIndex": 0,
+          "suitability": 5
+        },
+        {
+          "scenarioIndex": 1,
+          "suitability": 5
+        },
+        {
+          "scenarioIndex": 2,
+          "suitability": 5
+        }
+      ],
+      "usr_1781205903369": [
+        {
+          "scenarioIndex": 0,
+          "suitability": 3
+        },
+        {
+          "scenarioIndex": 1,
+          "suitability": 3
+        },
+        {
+          "scenarioIndex": 2,
+          "suitability": 3
+        }
+      ]
+    },
+    "status": "completed",
+    "created_at": "2026-06-11T19:25:03.369Z",
+    "consensus": {
+      "agreementScore": 55,
+      "consensusLevel": "Strong Divergent Perspectives",
+      "winningPathTitle": "Successful Phased Migration",
+      "results": [
+        {
+          "scenarioIndex": 0,
+          "title": "Successful Phased Migration",
+          "weightedScore": 4.2,
+          "rawScore": 4,
+          "individualVotes": [
+            {
+              "name": "Alice",
+              "personality": "analytical",
+              "rawVote": 3,
+              "weightedVote": 3.1,
+              "alignmentIndex": 102
+            },
+            {
+              "name": "Bob",
+              "personality": "risk-taker",
+              "rawVote": 5,
+              "weightedVote": 7.1,
+              "alignmentIndex": 143
+            }
+          ]
+        },
+        {
+          "scenarioIndex": 1,
+          "title": "Partial Migration with Hybrid Architecture",
+          "weightedScore": 4.1,
+          "rawScore": 4,
+          "individualVotes": [
+            {
+              "name": "Alice",
+              "personality": "analytical",
+              "rawVote": 3,
+              "weightedVote": 2.7,
+              "alignmentIndex": 90
+            },
+            {
+              "name": "Bob",
+              "personality": "risk-taker",
+              "rawVote": 5,
+              "weightedVote": 5.9,
+              "alignmentIndex": 118
+            }
+          ]
+        },
+        {
+          "scenarioIndex": 2,
+          "title": "Maintain Current System with Optimization",
+          "weightedScore": 3.9,
+          "rawScore": 4,
+          "individualVotes": [
+            {
+              "name": "Alice",
+              "personality": "analytical",
+              "rawVote": 3,
+              "weightedVote": 2.6,
+              "alignmentIndex": 88
+            },
+            {
+              "name": "Bob",
+              "personality": "risk-taker",
+              "rawVote": 5,
+              "weightedVote": 3.8,
+              "alignmentIndex": 75
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "8GE5J": {
+    "code": "8GE5J",
+    "decision": "Should i feed to be patient?",
+    "risk": "high",
+    "personality": "balanced",
+    "hostId": "usr_1781239825152",
+    "hostName": "Test",
+    "scenarios": [
+      {
+        "title": "Scenario 1: Immediate Impulse Gratification",
+        "temporal_outcomes": {
+          "1": {
+            "description": "Short-term satisfaction is achieved, potentially followed by a transient sense of regret or a diminished capacity for future patience.",
+            "probability": 60,
+            "risk_level": "medium",
+            "emotional_impact": "Fleeting satisfaction",
+            "radar_metrics": {
+              "risk": 55,
+              "reward": 70,
+              "time_cost": 20,
+              "emotional_toll": 30,
+              "reversibility": 70
+            },
+            "monte_carlo_distribution": [
+              35,
+              107,
+              340,
+              894,
+              1563,
+              2049,
+              2128,
+              1537,
+              820,
+              527
+            ]
+          },
+          "3": {
+            "description": "The pattern of immediate gratification may become more entrenched, leading to a reduced ability to tolerate discomfort or delay rewards.",
+            "probability": 45,
+            "risk_level": "high",
+            "emotional_impact": "Habitual",
+            "radar_metrics": {
+              "risk": 70,
+              "reward": 50,
+              "time_cost": 40,
+              "emotional_toll": 50,
+              "reversibility": 50
+            },
+            "monte_carlo_distribution": [
+              253,
+              550,
+              1230,
+              1943,
+              2105,
+              1916,
+              1195,
+              551,
+              204,
+              53
+            ]
+          },
+          "5": {
+            "description": "Long-term goals requiring sustained effort or patience may be compromised, resulting in suboptimal outcomes and potential frustration.",
+            "probability": 35,
+            "risk_level": "high",
+            "emotional_impact": "Unfulfilled",
+            "radar_metrics": {
+              "risk": 80,
+              "reward": 30,
+              "time_cost": 60,
+              "emotional_toll": 70,
+              "reversibility": 30
+            },
+            "monte_carlo_distribution": [
+              818,
+              1208,
+              1783,
+              2165,
+              1969,
+              1248,
+              575,
+              183,
+              44,
+              7
+            ]
+          },
+          "10": {
+            "description": "A consistent pattern of prioritizing immediate impulses over long-term patience may lead to significant opportunity costs and reduced overall well-being.",
+            "probability": 25,
+            "risk_level": "high",
+            "emotional_impact": "Regretful",
+            "radar_metrics": {
+              "risk": 90,
+              "reward": 20,
+              "time_cost": 80,
+              "emotional_toll": 80,
+              "reversibility": 10
+            },
+            "monte_carlo_distribution": [
+              2062,
+              1857,
+              2207,
+              1809,
+              1225,
+              583,
+              199,
+              45,
+              11,
+              2
+            ]
+          }
+        },
+        "consequence_tree": {
+          "title": "Indulge Immediate Impulse",
+          "probability": 100,
+          "branches": [
+            {
+              "title": "Short-term hedonic gain",
+              "probability": 70,
+              "branches": [
+                {
+                  "title": "Diminished capacity for future restraint",
+                  "probability": 60,
+                  "branches": [
+                    {
+                      "title": "Increased susceptibility to similar impulses",
+                      "probability": 40,
+                      "branches": []
+                    }
+                  ]
+                },
+                {
+                  "title": "Temporary emotional relief",
+                  "probability": 40,
+                  "branches": []
+                }
+              ]
+            },
+            {
+              "title": "Immediate regret or guilt",
+              "probability": 30,
+              "branches": [
+                {
+                  "title": "Motivation for future behavioral change",
+                  "probability": 50,
+                  "branches": []
+                },
+                {
+                  "title": "Reinforcement of negative self-perception",
+                  "probability": 50,
+                  "branches": []
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "title": "Scenario 2: Sustained Patience Cultivation",
+        "temporal_outcomes": {
+          "1": {
+            "description": "Initial discomfort or frustration is experienced, but a sense of self-control and growing resilience begins to emerge.",
+            "probability": 70,
+            "risk_level": "low",
+            "emotional_impact": "Disciplined",
+            "radar_metrics": {
+              "risk": 30,
+              "reward": 40,
+              "time_cost": 60,
+              "emotional_toll": 50,
+              "reversibility": 80
+            },
+            "monte_carlo_distribution": [
+              5,
+              26,
+              93,
+              333,
+              892,
+              1556,
+              2173,
+              2037,
+              1583,
+              1302
+            ]
+          },
+          "3": {
+            "description": "Self-regulation skills are strengthened, leading to more deliberate decision-making and a reduced impact of immediate impulses.",
+            "probability": 75,
+            "risk_level": "low",
+            "emotional_impact": "Empowered",
+            "radar_metrics": {
+              "risk": 20,
+              "reward": 65,
+              "time_cost": 70,
+              "emotional_toll": 40,
+              "reversibility": 60
+            },
+            "monte_carlo_distribution": [
+              2,
+              11,
+              59,
+              196,
+              588,
+              1249,
+              1790,
+              2248,
+              1895,
+              1962
+            ]
+          },
+          "5": {
+            "description": "Long-term objectives that require patience are more likely to be achieved, fostering a sense of accomplishment and strategic advantage.",
+            "probability": 80,
+            "risk_level": "low",
+            "emotional_impact": "Accomplished",
+            "radar_metrics": {
+              "risk": 15,
+              "reward": 80,
+              "time_cost": 75,
+              "emotional_toll": 30,
+              "reversibility": 40
+            },
+            "monte_carlo_distribution": [
+              1,
+              0,
+              24,
+              110,
+              335,
+              886,
+              1577,
+              2115,
+              2122,
+              2830
+            ]
+          },
+          "10": {
+            "description": "A robust capacity for patience becomes an integrated behavioral trait, contributing to enhanced well-being, strategic success, and reduced stress.",
+            "probability": 85,
+            "risk_level": "low",
+            "emotional_impact": "Serene",
+            "radar_metrics": {
+              "risk": 10,
+              "reward": 90,
+              "time_cost": 80,
+              "emotional_toll": 20,
+              "reversibility": 20
+            },
+            "monte_carlo_distribution": [
+              0,
+              2,
+              10,
+              39,
+              189,
+              563,
+              1171,
+              1937,
+              2231,
+              3858
+            ]
+          }
+        },
+        "consequence_tree": {
+          "title": "Exercise Behavioral Restraint",
+          "probability": 100,
+          "branches": [
+            {
+              "title": "Initial cognitive and emotional effort",
+              "probability": 60,
+              "branches": [
+                {
+                  "title": "Strengthened self-regulation mechanisms",
+                  "probability": 70,
+                  "branches": [
+                    {
+                      "title": "Improved long-term decision quality",
+                      "probability": 50,
+                      "branches": []
+                    }
+                  ]
+                },
+                {
+                  "title": "Temporary emotional strain",
+                  "probability": 30,
+                  "branches": []
+                }
+              ]
+            },
+            {
+              "title": "Achievement of desired patient outcome",
+              "probability": 40,
+              "branches": [
+                {
+                  "title": "Positive reinforcement of patience behavior",
+                  "probability": 80,
+                  "branches": []
+                },
+                {
+                  "title": "Missed immediate, minor opportunity",
+                  "probability": 20,
+                  "branches": []
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "title": "Scenario 3: Strategic Delay and Re-evaluation",
+        "temporal_outcomes": {
+          "1": {
+            "description": "A conscious delay in action allows for impulse intensity to decrease, facilitating a more rational assessment of options and consequences.",
+            "probability": 75,
+            "risk_level": "medium",
+            "emotional_impact": "Deliberate",
+            "radar_metrics": {
+              "risk": 40,
+              "reward": 60,
+              "time_cost": 40,
+              "emotional_toll": 40,
+              "reversibility": 90
+            },
+            "monte_carlo_distribution": [
+              2,
+              9,
+              54,
+              186,
+              537,
+              1181,
+              1900,
+              2225,
+              1914,
+              1992
+            ]
+          },
+          "3": {
+            "description": "The ability to strategically pause and re-evaluate becomes a valuable decision-making tool, leading to more adaptive responses to impulses.",
+            "probability": 70,
+            "risk_level": "low",
+            "emotional_impact": "Adaptive",
+            "radar_metrics": {
+              "risk": 30,
+              "reward": 70,
+              "time_cost": 50,
+              "emotional_toll": 30,
+              "reversibility": 70
+            },
+            "monte_carlo_distribution": [
+              1,
+              19,
+              124,
+              353,
+              864,
+              1594,
+              2130,
+              2073,
+              1536,
+              1306
+            ]
+          },
+          "5": {
+            "description": "This approach fosters a balanced perspective, integrating both immediate needs and long-term objectives, optimizing resource allocation.",
+            "probability": 65,
+            "risk_level": "low",
+            "emotional_impact": "Balanced",
+            "radar_metrics": {
+              "risk": 20,
+              "reward": 75,
+              "time_cost": 60,
+              "emotional_toll": 25,
+              "reversibility": 50
+            },
+            "monte_carlo_distribution": [
+              12,
+              55,
+              192,
+              588,
+              1219,
+              1870,
+              2202,
+              1801,
+              1246,
+              815
+            ]
+          },
+          "10": {
+            "description": "The development of a robust meta-cognitive strategy for impulse management results in consistent, high-quality decision outcomes and sustained well-being.",
+            "probability": 60,
+            "risk_level": "low",
+            "emotional_impact": "Optimized",
+            "radar_metrics": {
+              "risk": 15,
+              "reward": 80,
+              "time_cost": 70,
+              "emotional_toll": 20,
+              "reversibility": 30
+            },
+            "monte_carlo_distribution": [
+              31,
+              109,
+              358,
+              818,
+              1527,
+              2122,
+              2113,
+              1599,
+              821,
+              502
+            ]
+          }
+        },
+        "consequence_tree": {
+          "title": "Implement Delay Mechanism",
+          "probability": 100,
+          "branches": [
+            {
+              "title": "Impulse intensity decreases",
+              "probability": 70,
+              "branches": [
+                {
+                  "title": "Rational assessment of options",
+                  "probability": 80,
+                  "branches": [
+                    {
+                      "title": "Informed decision aligned with long-term goals",
+                      "probability": 60,
+                      "branches": []
+                    }
+                  ]
+                },
+                {
+                  "title": "Impulse re-emerges with less force",
+                  "probability": 20,
+                  "branches": []
+                }
+              ]
+            },
+            {
+              "title": "Impulse persists or intensifies",
+              "probability": 30,
+              "branches": [
+                {
+                  "title": "Increased cognitive load",
+                  "probability": 50,
+                  "branches": []
+                },
+                {
+                  "title": "Forced decision under pressure",
+                  "probability": 50,
+                  "branches": []
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "scenariosMeta": {
+      "confidence_assessment": {
+        "level": "Low Confidence",
+        "score": 35,
+        "limitations": [
+          "Ambiguity regarding the specific nature of the 'feed' action and the desired 'patience' outcome.",
+          "Absence of contextual details defining the decision's domain (e.g., personal, professional, relational).",
+          "Lack of defined metrics or criteria for evaluating the success or failure of either choice."
+        ]
+      },
+      "cognitive_analysis": {
+        "bias_score": 55,
+        "detected_biases": [
+          {
+            "name": "Temporal Discounting",
+            "severity": "medium",
+            "explanation": "The decision implicitly weighs an immediate action ('feed') against a future state ('be patient'), indicating a potential preference for present rewards over future benefits."
+          },
+          {
+            "name": "Framing Effect",
+            "severity": "low",
+            "explanation": "The term 'feed' frames the immediate action as a necessary input or indulgence, potentially biasing the decision towards its perceived benefit rather than its long-term cost."
+          }
+        ],
+        "reframed_decision": "Analyze the long-term utility of immediate impulse gratification versus the strategic benefits of sustained behavioral restraint."
+      },
+      "boardroom_debate": {
+        "advisors": [
+          {
+            "name": "Logical & Behavioral Perspective",
+            "role": "Analyzes cognitive patterns, immediate impulses, and emotional framing"
+          },
+          {
+            "name": "Risk & Sustainability Perspective",
+            "role": "Analyzes long-term viability, resource preservation, and environmental trade-offs"
+          }
+        ],
+        "debate_transcript": [
+          {
+            "speaker": "Logical & Behavioral Perspective",
+            "message": "Immediate impulses often leverage present bias, making short-term gratification appear disproportionately valuable compared to the cognitive effort required for patience."
+          },
+          {
+            "speaker": "Risk & Sustainability Perspective",
+            "message": "Sustained indulgence of immediate impulses can deplete long-term behavioral capital, compromising future adaptability and resource allocation for strategic objectives."
+          }
+        ],
+        "consensus_summary": "Both perspectives concur that unexamined immediate gratification poses a systemic risk to long-term behavioral sustainability and optimal decision outcomes."
+      },
+      "final_note": "This simulation provides an analytical framework for evaluating the decision based on provided parameters and general behavioral science principles. It does not constitute direct advice."
+    },
+    "participants": [
+      {
+        "id": "usr_1781239825152",
+        "name": "Test",
+        "personality": "balanced",
+        "isHost": true
+      }
+    ],
+    "votes": {
+      "usr_1781239825152": [
+        {
+          "scenarioIndex": 0,
+          "suitability": 3
+        },
+        {
+          "scenarioIndex": 1,
+          "suitability": 3
+        },
+        {
+          "scenarioIndex": 2,
+          "suitability": 3
+        }
+      ]
+    },
+    "status": "completed",
+    "created_at": "2026-06-12T04:50:25.153Z",
+    "consensus": {
+      "agreementScore": 100,
+      "consensusLevel": "High Consensus Agreement",
+      "winningPathTitle": "Scenario 1: Immediate Impulse Gratification",
+      "results": [
+        {
+          "scenarioIndex": 0,
+          "title": "Scenario 1: Immediate Impulse Gratification",
+          "weightedScore": 3,
+          "rawScore": 3,
+          "individualVotes": [
+            {
+              "name": "Test",
+              "personality": "balanced",
+              "rawVote": 3,
+              "weightedVote": 3,
+              "alignmentIndex": 100
+            }
+          ]
+        },
+        {
+          "scenarioIndex": 1,
+          "title": "Scenario 2: Sustained Patience Cultivation",
+          "weightedScore": 3,
+          "rawScore": 3,
+          "individualVotes": [
+            {
+              "name": "Test",
+              "personality": "balanced",
+              "rawVote": 3,
+              "weightedVote": 3,
+              "alignmentIndex": 100
+            }
+          ]
+        },
+        {
+          "scenarioIndex": 2,
+          "title": "Scenario 3: Strategic Delay and Re-evaluation",
+          "weightedScore": 3,
+          "rawScore": 3,
+          "individualVotes": [
+            {
+              "name": "Test",
+              "personality": "balanced",
+              "rawVote": 3,
+              "weightedVote": 3,
+              "alignmentIndex": 100
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "4Z4CV": {
+    "code": "4Z4CV",
+    "decision": "Should I feed to be marry?",
+    "risk": "high",
+    "personality": "risk-taker",
+    "hostId": "usr_1781244665615",
+    "hostName": "Cameran",
+    "scenarios": [
+      {
+        "title": "Calm Observation & Boundary Recognition",
+        "description": "Remaining still or moving slowly prevents activating the pet's protective or chase instincts.",
+        "timeline": "1-10 minutes",
+        "risk_level": "low",
+        "emotional_impact": "Measured",
+        "probability": 65,
+        "reasoning": "Probability Heuristic: The base rate of 75% is adjusted to 65% based on a High risk posture and a Risk-taker decision lens. Systems Analysis: Slowing physical velocity prevents triggering automated prey or chase reflexes in domesticated animals.",
+        "causal_chain": {
+          "title": "Maintain low movement profile",
+          "probability": 100,
+          "next": {
+            "title": "Pet registers non-threatening visual cues",
+            "probability": 80,
+            "next": {
+              "title": "Pet disengages/settles in neutral state",
+              "probability": 60
+            }
+          }
+        },
+        "temporal_outcomes": {
+          "1": {
+            "description": "Year 1: Remaining still or moving slowly prevents activating the pet's protective or chase instincts.",
+            "probability": 65,
+            "risk_level": "low",
+            "emotional_impact": "Measured",
+            "radar_metrics": {
+              "risk": 25,
+              "reward": 85,
+              "time_cost": 40,
+              "emotional_toll": 40,
+              "reversibility": 75
+            },
+            "monte_carlo_distribution": [
+              12,
+              47,
+              187,
+              595,
+              1250,
+              1873,
+              2216,
+              1804,
+              1175,
+              841
+            ]
+          },
+          "3": {
+            "description": "Year 3: The scenario outcome stabilizes, leading to gradual system normalization and compounding strategic returns.",
+            "probability": 61,
+            "risk_level": "low",
+            "emotional_impact": "Fulfilled",
+            "radar_metrics": {
+              "risk": 30,
+              "reward": 95,
+              "time_cost": 50,
+              "emotional_toll": 30,
+              "reversibility": 65
+            },
+            "monte_carlo_distribution": [
+              14,
+              90,
+              322,
+              791,
+              1528,
+              2083,
+              2131,
+              1621,
+              919,
+              501
+            ]
+          },
+          "5": {
+            "description": "Year 5: Structural path dependencies assert themselves. Results yield deeply integrated long-term stability and maximized utility yield.",
+            "probability": 57,
+            "risk_level": "low",
+            "emotional_impact": "Serene",
+            "radar_metrics": {
+              "risk": 35,
+              "reward": 100,
+              "time_cost": 65,
+              "emotional_toll": 20,
+              "reversibility": 55
+            },
+            "monte_carlo_distribution": [
+              43,
+              146,
+              486,
+              1067,
+              1697,
+              2214,
+              2002,
+              1346,
+              683,
+              316
+            ]
+          },
+          "10": {
+            "description": "Year 10: Generational timeline horizon fully realized. The decision is now a foundational bedrock of system sustainability and compounding growth.",
+            "probability": 53,
+            "risk_level": "low",
+            "emotional_impact": "Wise",
+            "radar_metrics": {
+              "risk": 40,
+              "reward": 100,
+              "time_cost": 80,
+              "emotional_toll": 10,
+              "reversibility": 35
+            },
+            "monte_carlo_distribution": [
+              98,
+              254,
+              664,
+              1320,
+              2034,
+              2164,
+              1730,
+              1066,
+              465,
+              205
+            ]
+          }
+        },
+        "consequence_tree": {
+          "title": "Calm Observation & Boundary Recognition",
+          "probability": 100,
+          "branches": [
+            {
+              "title": "Maintain low movement profile",
+              "probability": 100,
+              "branches": [
+                {
+                  "title": "Pet registers non-threatening visual cues",
+                  "probability": 80,
+                  "branches": [
+                    {
+                      "title": "Pet disengages/settles in neutral state",
+                      "probability": 60,
+                      "branches": []
+                    }
+                  ]
+                },
+                {
+                  "title": "Alternative 2nd Order Consequence (Variance pathway)",
+                  "probability": 40,
+                  "branches": []
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "title": "High-Energy Play / Chase Activation",
+        "description": "Sudden acceleration triggers the pet's natural chasing drive, leading to an active chase or accidental play bite.",
+        "timeline": "5-15 minutes",
+        "risk_level": "medium",
+        "emotional_impact": "Anxious",
+        "probability": 60,
+        "reasoning": "Probability Heuristic: The base rate of 45% is adjusted to 60% based on a High risk posture and a Risk-taker decision lens. Systems Analysis: Rapid movement triggers instinctual prey drive mechanisms.",
+        "causal_chain": {
+          "title": "Initiate sudden acceleration/flight response",
+          "probability": 100,
+          "next": {
+            "title": "Pet activates instinctual chase response",
+            "probability": 85,
+            "next": {
+              "title": "Accidental collision, bite, or scratch occurs",
+              "probability": 55
+            }
+          }
+        },
+        "temporal_outcomes": {
+          "1": {
+            "description": "Year 1: Sudden acceleration triggers the pet's natural chasing drive, leading to an active chase or accidental play bite.",
+            "probability": 60,
+            "risk_level": "medium",
+            "emotional_impact": "Anxious",
+            "radar_metrics": {
+              "risk": 50,
+              "reward": 85,
+              "time_cost": 40,
+              "emotional_toll": 40,
+              "reversibility": 75
+            },
+            "monte_carlo_distribution": [
+              34,
+              97,
+              347,
+              846,
+              1578,
+              2059,
+              2178,
+              1540,
+              857,
+              464
+            ]
+          },
+          "3": {
+            "description": "Year 3: The scenario outcome stabilizes, leading to gradual system normalization and compounding strategic returns.",
+            "probability": 56,
+            "risk_level": "low",
+            "emotional_impact": "Fulfilled",
+            "radar_metrics": {
+              "risk": 55,
+              "reward": 95,
+              "time_cost": 50,
+              "emotional_toll": 30,
+              "reversibility": 65
+            },
+            "monte_carlo_distribution": [
+              44,
+              192,
+              511,
+              1121,
+              1801,
+              2184,
+              2013,
+              1194,
+              627,
+              313
+            ]
+          },
+          "5": {
+            "description": "Year 5: Structural path dependencies assert themselves. Results yield deeply integrated long-term stability and maximized utility yield.",
+            "probability": 52,
+            "risk_level": "low",
+            "emotional_impact": "Serene",
+            "radar_metrics": {
+              "risk": 60,
+              "reward": 100,
+              "time_cost": 65,
+              "emotional_toll": 20,
+              "reversibility": 55
+            },
+            "monte_carlo_distribution": [
+              81,
+              273,
+              704,
+              1472,
+              2107,
+              2090,
+              1701,
+              996,
+              411,
+              165
+            ]
+          },
+          "10": {
+            "description": "Year 10: Generational timeline horizon fully realized. The decision is now a foundational bedrock of system sustainability and compounding growth.",
+            "probability": 48,
+            "risk_level": "low",
+            "emotional_impact": "Wise",
+            "radar_metrics": {
+              "risk": 65,
+              "reward": 100,
+              "time_cost": 80,
+              "emotional_toll": 10,
+              "reversibility": 35
+            },
+            "monte_carlo_distribution": [
+              171,
+              465,
+              995,
+              1699,
+              2141,
+              2038,
+              1386,
+              711,
+              298,
+              96
+            ]
+          }
+        },
+        "consequence_tree": {
+          "title": "High-Energy Play / Chase Activation",
+          "probability": 100,
+          "branches": [
+            {
+              "title": "Initiate sudden acceleration/flight response",
+              "probability": 100,
+              "branches": [
+                {
+                  "title": "Pet activates instinctual chase response",
+                  "probability": 85,
+                  "branches": [
+                    {
+                      "title": "Accidental collision, bite, or scratch occurs",
+                      "probability": 55,
+                      "branches": []
+                    }
+                  ]
+                },
+                {
+                  "title": "Alternative 2nd Order Consequence (Variance pathway)",
+                  "probability": 40,
+                  "branches": []
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "title": "Guided Redirection",
+        "description": "Using a toy or treat redirects the pet's attention to a safe object, neutralizing potential friction.",
+        "timeline": "2-5 minutes",
+        "risk_level": "low",
+        "emotional_impact": "Optimistic",
+        "probability": 70,
+        "reasoning": "Probability Heuristic: The base rate of 80% is adjusted to 70% based on a High risk posture and a Risk-taker decision lens. Systems Analysis: Stimulus substitution effectively transfers focus from human movement to a primary reward.",
+        "causal_chain": {
+          "title": "Deploy high-value food or toy stimulus",
+          "probability": 100,
+          "next": {
+            "title": "Pet shifts focus from human to object",
+            "probability": 90,
+            "next": {
+              "title": "Safe distance established and behavior reset",
+              "probability": 80
+            }
+          }
+        },
+        "temporal_outcomes": {
+          "1": {
+            "description": "Year 1: Using a toy or treat redirects the pet's attention to a safe object, neutralizing potential friction.",
+            "probability": 70,
+            "risk_level": "low",
+            "emotional_impact": "Optimistic",
+            "radar_metrics": {
+              "risk": 25,
+              "reward": 85,
+              "time_cost": 40,
+              "emotional_toll": 40,
+              "reversibility": 75
+            },
+            "monte_carlo_distribution": [
+              9,
+              18,
+              98,
+              327,
+              854,
+              1535,
+              2113,
+              2122,
+              1577,
+              1347
+            ]
+          },
+          "3": {
+            "description": "Year 3: The scenario outcome stabilizes, leading to gradual system normalization and compounding strategic returns.",
+            "probability": 66,
+            "risk_level": "low",
+            "emotional_impact": "Fulfilled",
+            "radar_metrics": {
+              "risk": 30,
+              "reward": 95,
+              "time_cost": 50,
+              "emotional_toll": 30,
+              "reversibility": 65
+            },
+            "monte_carlo_distribution": [
+              10,
+              45,
+              176,
+              537,
+              1159,
+              1761,
+              2103,
+              1995,
+              1254,
+              960
+            ]
+          },
+          "5": {
+            "description": "Year 5: Structural path dependencies assert themselves. Results yield deeply integrated long-term stability and maximized utility yield.",
+            "probability": 62,
+            "risk_level": "low",
+            "emotional_impact": "Serene",
+            "radar_metrics": {
+              "risk": 35,
+              "reward": 100,
+              "time_cost": 65,
+              "emotional_toll": 20,
+              "reversibility": 55
+            },
+            "monte_carlo_distribution": [
+              15,
+              68,
+              273,
+              713,
+              1405,
+              2027,
+              2161,
+              1732,
+              1024,
+              582
+            ]
+          },
+          "10": {
+            "description": "Year 10: Generational timeline horizon fully realized. The decision is now a foundational bedrock of system sustainability and compounding growth.",
+            "probability": 58,
+            "risk_level": "low",
+            "emotional_impact": "Wise",
+            "radar_metrics": {
+              "risk": 40,
+              "reward": 100,
+              "time_cost": 80,
+              "emotional_toll": 10,
+              "reversibility": 35
+            },
+            "monte_carlo_distribution": [
+              47,
+              133,
+              450,
+              974,
+              1758,
+              2167,
+              1981,
+              1364,
+              758,
+              368
+            ]
+          }
+        },
+        "consequence_tree": {
+          "title": "Guided Redirection",
+          "probability": 100,
+          "branches": [
+            {
+              "title": "Deploy high-value food or toy stimulus",
+              "probability": 100,
+              "branches": [
+                {
+                  "title": "Pet shifts focus from human to object",
+                  "probability": 90,
+                  "branches": [
+                    {
+                      "title": "Safe distance established and behavior reset",
+                      "probability": 80,
+                      "branches": []
+                    }
+                  ]
+                },
+                {
+                  "title": "Alternative 2nd Order Consequence (Variance pathway)",
+                  "probability": 40,
+                  "branches": []
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "scenariosMeta": {
+      "confidence_assessment": {
+        "level": "High Confidence",
+        "score": 80,
+        "limitations": [
+          "Animal behavioral history and specific socialization baseline are unquantified.",
+          "Indoor physical layout, slip factors, and exit routes are unspecified.",
+          "Self-reported phrasing lacks active visual threat indicators or body posture cues."
+        ]
+      },
+      "cognitive_analysis": {
+        "bias_score": 25,
+        "detected_biases": [
+          {
+            "name": "Baseline Cognitive Heuristics",
+            "severity": "low",
+            "explanation": "Standard mental shortcuts used to maintain operational velocity in decision modeling, without significant distortion."
+          }
+        ],
+        "reframed_decision": "What are the physiological safety differences between staying calm or utilizing direct food distraction when managing animal behaviors?"
+      },
+      "boardroom_debate": {
+        "advisors": [
+          {
+            "name": "Logical & Behavioral Perspective",
+            "role": "Analyzes cognitive patterns, immediate impulses, and emotional framing"
+          },
+          {
+            "name": "Risk & Sustainability Perspective",
+            "role": "Analyzes long-term viability, resource preservation, and environmental trade-offs"
+          }
+        ],
+        "debate_transcript": [
+          {
+            "speaker": "Logical & Behavioral Perspective",
+            "message": "Moving energetically stimulates protective threat assessments or play-chase reflexes in domestic animals."
+          },
+          {
+            "speaker": "Risk & Sustainability Perspective",
+            "message": "Confinement limits mobility margins, amplifying collision hazards and protective scratch probabilities. Static positioning reduces system volatility."
+          }
+        ],
+        "consensus_summary": "Use positive reinforcement or calm positioning as primary safety metrics, reserving physical play for outdoor spaces."
+      },
+      "final_note": "This simulation outlines potential scenarios based on a risk profile of High and a Risk-taker decision-making lens. It represents a theoretical modeling of possibilities using current behavioral heuristics, and is not, under any circumstances, to be considered direct personal, career, financial, or legal advice. Every decision carries unique real-world variables; maintain independent agency and exercise personal caution."
+    },
+    "participants": [
+      {
+        "id": "usr_1781244665615",
+        "name": "Cameran",
+        "personality": "risk-taker",
+        "isHost": true
+      }
+    ],
+    "votes": {
+      "usr_1781244665615": [
+        {
+          "scenarioIndex": 0,
+          "suitability": 3
+        },
+        {
+          "scenarioIndex": 1,
+          "suitability": 3
+        },
+        {
+          "scenarioIndex": 2,
+          "suitability": 3
+        }
+      ]
+    },
+    "status": "completed",
+    "created_at": "2026-06-12T06:11:05.615Z",
+    "consensus": {
+      "agreementScore": 100,
+      "consensusLevel": "High Consensus Agreement",
+      "winningPathTitle": "Calm Observation & Boundary Recognition",
+      "results": [
+        {
+          "scenarioIndex": 0,
+          "title": "Calm Observation & Boundary Recognition",
+          "weightedScore": 3,
+          "rawScore": 3,
+          "individualVotes": [
+            {
+              "name": "Cameran",
+              "personality": "risk-taker",
+              "rawVote": 3,
+              "weightedVote": 4.9,
+              "alignmentIndex": 163
+            }
+          ]
+        },
+        {
+          "scenarioIndex": 1,
+          "title": "High-Energy Play / Chase Activation",
+          "weightedScore": 3,
+          "rawScore": 3,
+          "individualVotes": [
+            {
+              "name": "Cameran",
+              "personality": "risk-taker",
+              "rawVote": 3,
+              "weightedVote": 6,
+              "alignmentIndex": 200
+            }
+          ]
+        },
+        {
+          "scenarioIndex": 2,
+          "title": "Guided Redirection",
+          "weightedScore": 3,
+          "rawScore": 3,
+          "individualVotes": [
+            {
+              "name": "Cameran",
+              "personality": "risk-taker",
+              "rawVote": 3,
+              "weightedVote": 4.9,
+              "alignmentIndex": 163
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

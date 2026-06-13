@@ -2,6 +2,7 @@
 import axios from 'axios';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
+import { getSubscriptionTier } from './storage';
 
 // Dynamically resolve machine IP for mobile testing, fallback to localhost for web
 const getBackendUrl = () => {
@@ -275,13 +276,20 @@ function ensureTemporalAndTreeLocal(scenarios, risk, personality) {
  * Simulates future outcomes for a decision
  * Calls POST /simulate. Falls back to a local generator on failure/network errors.
  */
-export async function simulateDecision(decision, risk, personality) {
+export async function simulateDecision(decision, risk, personality, advisors) {
   const normalized = normalizeInput(decision);
+  const sub = await getSubscriptionTier();
   try {
     const response = await api.post(API_URL, {
       decision: normalized,
       risk,
       personality,
+      advisors
+    }, {
+      headers: {
+        'x-user-tier': sub.tier,
+        'x-user-id': 'default_user'
+      }
     });
     
     let result = response.data;
@@ -306,7 +314,7 @@ export async function simulateDecision(decision, risk, personality) {
     // Artificial delay to simulate real network request and showcase loading state nicely
     await new Promise((resolve) => setTimeout(resolve, 1500));
     
-    let offlineResult = generateOfflineSimulation(normalized, risk, personality);
+    let offlineResult = generateOfflineSimulation(normalized, risk, personality, advisors);
     if (offlineResult.scenarios && Array.isArray(offlineResult.scenarios)) {
       offlineResult.scenarios = ensureTemporalAndTreeLocal(offlineResult.scenarios, risk, personality);
       offlineResult.scenarios.forEach(s => {
@@ -465,7 +473,7 @@ function getHeuristicBiases(text, biasScore) {
   return detected;
 }
 
-function generateOfflineSimulation(decision, riskTolerance, personality) {
+function generateOfflineSimulation(decision, riskTolerance, personality, customAdvisors) {
   const norm = decision.toLowerCase();
   const cleanNorm = norm.replace(/[?.!,]/g, '').trim();
 
@@ -763,53 +771,79 @@ function generateOfflineSimulation(decision, riskTolerance, personality) {
   }
 
   let reframedDecision = `Should I evaluate the exact trade-offs of proceeding with this decision objectively?`;
-  let advisors = [
-    { name: "Logical & Behavioral Perspective", role: "Analyzes cognitive patterns, immediate impulses, and emotional framing" },
-    { name: "Risk & Sustainability Perspective", role: "Analyzes long-term viability, resource preservation, and environmental trade-offs" }
-  ];
+  let advisors = [];
   let debateTranscript = [];
   let consensusSummary = "";
 
-  if (hasPet) {
-    reframedDecision = `What are the physiological safety differences between staying calm or utilizing direct food distraction when managing animal behaviors?`;
-    debateTranscript = [
-      { speaker: "Logical & Behavioral Perspective", message: "Moving energetically stimulates protective threat assessments or play-chase reflexes in domestic animals." },
-      { speaker: "Risk & Sustainability Perspective", message: "Confinement limits mobility margins, amplifying collision hazards and protective scratch probabilities. Static positioning reduces system volatility." }
-    ];
-    consensusSummary = "Use positive reinforcement or calm positioning as primary safety metrics, reserving physical play for outdoor spaces.";
-
-  } else if (hasSymptom && hasDestination) {
-    reframedDecision = `Should I prioritize biological healing today, or accept cognitive performance drops to maintain attendance?`;
-    debateTranscript = [
-      { speaker: "Logical & Behavioral Perspective", message: "Pushing through cognitive thresholds under physiological distress creates temporal performance depletion, leading to severe resource degradation." },
-      { speaker: "Risk & Sustainability Perspective", message: "Active viral shedding under high-density spatial exposure elevates systemic contagion variance, causing net productivity drops." }
-    ];
-    consensusSummary = "Prioritize immediate recovery to minimize long-term performance deficits, while securing remote accommodation options.";
-
-  } else if (hasLeisure && hasProductivity) {
-    reframedDecision = `How should I divide my available hours between study tasks and leisure to maintain stress-free productivity?`;
-    debateTranscript = [
-      { speaker: "Logical & Behavioral Perspective", message: "Temporal discounting heavily weights immediate recreational utilities over distant academic goals. Burning baseline study windows creates deadline-pressure spikes." },
-      { speaker: "Risk & Sustainability Perspective", message: "System performance is highly correlated with cumulative preparation assets. Trading preparation for leisure compounds downside risks of subpar grading outcomes." }
-    ];
-    consensusSummary = "Execute a Pomodoro or structured split-time system to secure progress before unlocking guilt-free leisure rewards.";
-
-  } else if (hasFood) {
-    reframedDecision = `Should I consume this questionable item with potential mold markers, or utilize a safe nutritional alternative?`;
-    debateTranscript = [
-      { speaker: "Logical & Behavioral Perspective", message: "Loss aversion framing over food expenditure bias prompts ingestion of questionable produce, ignoring severe systemic biological hazards." },
-      { speaker: "Risk & Sustainability Perspective", message: "Microbial toxicity ingestion creates immediate physiological operational risks, yielding high resource deficits that far outweigh produce replacement costs." }
-    ];
-    consensusSummary = "Do not consume if structural integrity has degraded; prioritize physical safety when spotless alternatives exist.";
-
+  if (customAdvisors && Array.isArray(customAdvisors) && customAdvisors.length > 0) {
+    advisors = customAdvisors.map(adv => ({
+      name: adv.name,
+      role: adv.description || `Expert lens on ${adv.domainExpertise}`
+    }));
+    customAdvisors.forEach(adv => {
+      let message = "";
+      const expertise = (adv.domainExpertise || '').toLowerCase();
+      if (expertise.includes('finance') || expertise.includes('money') || expertise.includes('invest')) {
+        message = `From a financial perspective, this choice requires careful capitalization trade-offs. We must minimize sunk cost exposure and secure a sound ${adv.riskAppetite}-risk margin.`;
+      } else if (expertise.includes('tech') || expertise.includes('software') || expertise.includes('engineer') || expertise.includes('code')) {
+        message = `Analyzing the technical variables, this action introduces path dependencies and design velocity constraints. Ensure adequate risk buffers for integration overhead.`;
+      } else if (expertise.includes('health') || expertise.includes('medical') || expertise.includes('wellness')) {
+        message = `Prioritize physical and cognitive wellness baselines. Short-term performance peaks should not trigger long-term biological metabolic deficits.`;
+      } else if (expertise.includes('relation') || expertise.includes('personal') || expertise.includes('love')) {
+        message = `Human capital networks and social stability indices are heavily impacted. We should establish clear boundary metrics and maintain high-fidelity feedback loops.`;
+      } else {
+        message = `Evaluating via my specialized profile. We should analyze immediate outcomes, preserve flexibility, and maintain a ${adv.riskAppetite === 'high' ? 'decisive expansion' : 'conservative boundary'} approach.`;
+      }
+      debateTranscript.push({ speaker: adv.name, message });
+    });
+    consensusSummary = `Synthesizing boardroom viewpoints suggests proceeding with structural parameters defined by ${customAdvisors.map(a => a.name).join(' and ')}.`;
   } else {
-    let actionStr = cleanNorm.replace(/should i|should we|i want to|i need to|is it good to|what if i/gi, '').trim() || 'this action';
-    reframedDecision = `What are the clear resource expenditures, risks, and compounding advantages of choosing to: "${actionStr}"?`;
-    debateTranscript = [
-      { speaker: "Logical & Behavioral Perspective", message: "Status quo preservation prevents immediate asset dissipation but caps potential utility upside and growth margins." },
-      { speaker: "Risk & Sustainability Perspective", message: "Resource commitment under incomplete informational variance introduces systemic exposure. Pilot phases limit capital degradation." }
+    advisors = [
+      { name: "Logical & Behavioral Perspective", role: "Analyzes cognitive patterns, immediate impulses, and emotional framing" },
+      { name: "Risk & Sustainability Perspective", role: "Analyzes long-term viability, resource preservation, and environmental trade-offs" }
     ];
-    consensusSummary = "Pursue the action through small, low-risk experiments to validate outcomes before committing significant resources.";
+
+    if (hasPet) {
+      reframedDecision = `What are the physiological safety differences between staying calm or utilizing direct food distraction when managing animal behaviors?`;
+      debateTranscript = [
+        { speaker: "Logical & Behavioral Perspective", message: "Moving energetically stimulates protective threat assessments or play-chase reflexes in domestic animals." },
+        { speaker: "Risk & Sustainability Perspective", message: "Confinement limits mobility margins, amplifying collision hazards and protective scratch probabilities. Static positioning reduces system volatility." }
+      ];
+      consensusSummary = "Use positive reinforcement or calm positioning as primary safety metrics, reserving physical play for outdoor spaces.";
+  
+    } else if (hasSymptom && hasDestination) {
+      reframedDecision = `Should I prioritize biological healing today, or accept cognitive performance drops to maintain attendance?`;
+      debateTranscript = [
+        { speaker: "Logical & Behavioral Perspective", message: "Pushing through cognitive thresholds under physiological distress creates temporal performance depletion, leading to severe resource degradation." },
+        { speaker: "Risk & Sustainability Perspective", message: "Active viral shedding under high-density spatial exposure elevates systemic contagion variance, causing net productivity drops." }
+      ];
+      consensusSummary = "Prioritize immediate recovery to minimize long-term performance deficits, while securing remote accommodation options.";
+  
+    } else if (hasLeisure && hasProductivity) {
+      reframedDecision = `How should I divide my available hours between study tasks and leisure to maintain stress-free productivity?`;
+      debateTranscript = [
+        { speaker: "Logical & Behavioral Perspective", message: "Temporal discounting heavily weights immediate recreational utilities over distant academic goals. Burning baseline study windows creates deadline-pressure spikes." },
+        { speaker: "Risk & Sustainability Perspective", message: "System performance is highly correlated with cumulative preparation assets. Trading preparation for leisure compounds downside risks of subpar grading outcomes." }
+      ];
+      consensusSummary = "Execute a Pomodoro or structured split-time system to secure progress before unlocking guilt-free leisure rewards.";
+  
+    } else if (hasFood) {
+      reframedDecision = `Should I consume this questionable item with potential mold markers, or utilize a safe nutritional alternative?`;
+      debateTranscript = [
+        { speaker: "Logical & Behavioral Perspective", message: "Loss aversion framing over food expenditure bias prompts ingestion of questionable produce, ignoring severe systemic biological hazards." },
+        { speaker: "Risk & Sustainability Perspective", message: "Microbial toxicity ingestion creates immediate physiological operational risks, yielding high resource deficits that far outweigh produce replacement costs." }
+      ];
+      consensusSummary = "Do not consume if structural integrity has degraded; prioritize physical safety when spotless alternatives exist.";
+  
+    } else {
+      let actionStr = cleanNorm.replace(/should i|should we|i want to|i need to|is it good to|what if i/gi, '').trim() || 'this action';
+      reframedDecision = `What are the clear resource expenditures, risks, and compounding advantages of choosing to: "${actionStr}"?`;
+      debateTranscript = [
+        { speaker: "Logical & Behavioral Perspective", message: "Status quo preservation prevents immediate asset dissipation but caps potential utility upside and growth margins." },
+        { speaker: "Risk & Sustainability Perspective", message: "Resource commitment under incomplete informational variance introduces systemic exposure. Pilot phases limit capital degradation." }
+      ];
+      consensusSummary = "Pursue the action through small, low-risk experiments to validate outcomes before committing significant resources.";
+    }
   }
 
   return {
@@ -922,3 +956,60 @@ export async function transcribeAudio(base64Audio) {
     throw error;
   }
 }
+
+// --- COLLABORATIVE ROOMS ---
+export async function createCollabRoom(decision, risk, personality, hostName) {
+  const url = API_URL.replace('/simulate', '/api/collab/create');
+  const response = await api.post(url, { decision, risk, personality, hostName });
+  return response.data;
+}
+
+export async function joinCollabRoom(code, participantName, personality) {
+  const url = API_URL.replace('/simulate', '/api/collab/join');
+  const response = await api.post(url, { code, participantName, personality });
+  return response.data;
+}
+
+export async function startCollabRoom(code, hostId) {
+  const url = API_URL.replace('/simulate', '/api/collab/start');
+  const response = await api.post(url, { code, hostId });
+  return response.data;
+}
+
+export async function castCollabVote(code, participantId, votes) {
+  const url = API_URL.replace('/simulate', '/api/collab/vote');
+  const response = await api.post(url, { code, participantId, votes });
+  return response.data;
+}
+
+export async function getCollabRoomState(code) {
+  const url = API_URL.replace('/simulate', `/api/collab/room/${code}`);
+  const response = await api.get(url);
+  return response.data;
+}
+
+// --- DEVELOPER WEBHOOK CONSOLE ---
+export async function getWebhooks() {
+  const url = API_URL.replace('/simulate', '/api/webhooks');
+  const response = await api.get(url);
+  return response.data;
+}
+
+export async function registerWebhook(webhookUrl) {
+  const url = API_URL.replace('/simulate', '/api/webhooks/register');
+  const response = await api.post(url, { url: webhookUrl });
+  return response.data;
+}
+
+export async function deleteWebhook(id) {
+  const url = API_URL.replace('/simulate', `/api/webhooks/${id}`);
+  const response = await api.delete(url);
+  return response.data;
+}
+
+export async function testWebhook(webhookUrl) {
+  const url = API_URL.replace('/simulate', '/api/webhooks/test');
+  const response = await api.post(url, { url: webhookUrl });
+  return response.data;
+}
+

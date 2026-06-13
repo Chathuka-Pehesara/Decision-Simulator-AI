@@ -190,6 +190,9 @@ function runMonteCarlo(baseProbability, riskTolerance) {
 }
 
 const MEMORY_FILE_PATH = path.join(__dirname, 'data', 'memory.json');
+const ROOMS_FILE_PATH = path.join(__dirname, 'data', 'rooms.json');
+const WEBHOOKS_FILE_PATH = path.join(__dirname, 'data', 'webhooks.json');
+const USAGE_FILE_PATH = path.join(__dirname, 'data', 'usage.json');
 
 function initMemoryDir() {
   const dir = path.dirname(MEMORY_FILE_PATH);
@@ -198,30 +201,38 @@ function initMemoryDir() {
   }
 }
 
-function loadMemory() {
+function loadJsonFile(filePath, defaultValue) {
   initMemoryDir();
-  if (fs.existsSync(MEMORY_FILE_PATH)) {
+  if (fs.existsSync(filePath)) {
     try {
-      const data = fs.readFileSync(MEMORY_FILE_PATH, 'utf8');
+      const data = fs.readFileSync(filePath, 'utf8');
       return JSON.parse(data);
     } catch (err) {
-      console.error('[MEMORY ERROR] Failed to parse memory.json', err.message);
-      return [];
+      console.error(`[FILE ERROR] Failed to parse ${filePath}`, err.message);
+      return defaultValue;
     }
   }
-  return [];
+  return defaultValue;
+}
+
+function saveJsonFile(filePath, data) {
+  initMemoryDir();
+  try {
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
+  } catch (err) {
+    console.error(`[FILE ERROR] Failed to write ${filePath}`, err.message);
+  }
+}
+
+function loadMemory() {
+  return loadJsonFile(MEMORY_FILE_PATH, []);
 }
 
 function saveMemory(memory) {
-  initMemoryDir();
-  try {
-    if (memory.length > 100) {
-      memory = memory.slice(-100);
-    }
-    fs.writeFileSync(MEMORY_FILE_PATH, JSON.stringify(memory, null, 2), 'utf8');
-  } catch (err) {
-    console.error('[MEMORY ERROR] Failed to write memory.json', err.message);
+  if (memory.length > 100) {
+    memory = memory.slice(-100);
   }
+  saveJsonFile(MEMORY_FILE_PATH, memory);
 }
 
 function calculateDotProduct(vecA, vecB) {
@@ -311,6 +322,8 @@ function getModelDisplayName(modelString) {
     if (model.includes('llama-3-8b')) return 'Llama 3 (OpenRouter)';
     if (model.includes('gemma-2-9b')) return 'Gemma 2 (OpenRouter)';
     if (model.includes('gemini-2.5-flash')) return 'Gemini 2.5 Flash';
+    if (model.includes('gemini-2.0-flash')) return 'Gemini 2.0 Flash';
+    if (model.includes('gemini-1.5-flash')) return 'Gemini 1.5 Flash';
     if (model.includes('gpt-4o-mini')) return 'GPT-4o Mini';
     if (model.includes('claude-3-5-sonnet')) return 'Claude 3.5 Sonnet';
     
@@ -330,7 +343,13 @@ async function callLLM(provider, model, apiKey, prompt, useJsonMode = true) {
   try {
     if (provider === 'gemini') {
       url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-      const genConfig = useJsonMode ? { responseMimeType: 'application/json' } : {};
+      const genConfig = useJsonMode ? { 
+        responseMimeType: 'application/json',
+        temperature: 0.2,
+        maxOutputTokens: 8192
+      } : {
+        temperature: 0.7
+      };
       body = {
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: genConfig
@@ -639,7 +658,22 @@ function ensureTemporalAndTree(scenarios, risk, personality) {
  * Contacts Gemini API (and GPT-4 & Claude in parallel) to generate simulations.
  */
 app.post('/simulate', async (req, res) => {
-  const { decision, risk, personality } = req.body;
+  const { decision, risk, personality, advisors } = req.body;
+  const userTier = req.headers['x-user-tier'] || 'free';
+  const userId = req.headers['x-user-id'] || 'default_user';
+
+  // Enforcement of Freemium count limits
+  if (userTier === 'free') {
+    const usages = loadJsonFile(USAGE_FILE_PATH, {});
+    const count = usages[userId] || 0;
+    if (count >= 5) {
+      return res.status(403).json({
+        error: 'Usage limit reached.',
+        limitReached: true,
+        message: 'You have reached the free tier limit of 5 simulations. Please upgrade to Pro or Teams for unlimited access!'
+      });
+    }
+  }
 
   if (!decision || !decision.trim()) {
     return res.status(400).json({ error: 'Decision string is required.' });
@@ -684,14 +718,14 @@ app.post('/simulate', async (req, res) => {
   if (isKeyConfigured(primaryKey)) {
     console.log(`[AI MODE] Generating primary simulation (${primaryDisplayName}) for: "${normalized}"`);
     try {
-      primaryResult = await generatePrimarySimulation(normalized, risk, personality, primaryConfig.provider, primaryConfig.model, primaryKey);
+      primaryResult = await generatePrimarySimulation(normalized, risk, personality, primaryConfig.provider, primaryConfig.model, primaryKey, advisors);
     } catch (err) {
       console.error(`[AI MODE ERROR] Failed calling ${primaryDisplayName}, falling back to Server Simulator...`, err.message);
-      primaryResult = generateServerSimulation(normalized, risk, personality);
+      primaryResult = generateServerSimulation(normalized, risk, personality, advisors);
     }
   } else {
     console.log(`[SIMULATOR MODE] Serving local context scenarios for: "${normalized}"`);
-    primaryResult = generateServerSimulation(normalized, risk, personality);
+    primaryResult = generateServerSimulation(normalized, risk, personality, advisors);
   }
 
   // Ensure scenarios contain temporal_outcomes and consequence_tree formats
@@ -768,6 +802,22 @@ app.post('/simulate', async (req, res) => {
     saveMemory(memory);
   }
 
+  // Increment usage count for Free tier
+  if (userTier === 'free') {
+    const usages = loadJsonFile(USAGE_FILE_PATH, {});
+    usages[userId] = (usages[userId] || 0) + 1;
+    saveJsonFile(USAGE_FILE_PATH, usages);
+  }
+
+  // Trigger webhooks asynchronously
+  triggerWebhooks('simulation.completed', {
+    decision: normalized,
+    risk,
+    personality,
+    result: primaryResult,
+    timestamp: new Date().toISOString()
+  });
+
   return res.json(primaryResult);
 });
 
@@ -839,7 +889,47 @@ app.post('/transcribe', async (req, res) => {
   }
 });
 
-async function generatePrimarySimulation(decision, risk, personality, provider, model, apiKey) {
+async function generatePrimarySimulation(decision, risk, personality, provider, model, apiKey, customAdvisors) {
+  let boardroomDebateInstructions = `6. STRUCTURED PERSPECTIVE SIMULATION:
+   - Refine the multi-agent debate into a structured analysis of conflicting viewpoints. Structure 'boardroom_debate' with exactly 2 expert perspectives:
+     * "Logical & Behavioral Perspective": Analyzes cognitive patterns, immediate impulses, and emotional framing.
+     * "Risk & Sustainability Perspective": Analyzes long-term viability, resource preservation, and environmental trade-offs.
+   - Keep each perspective message limited to exactly 1-2 highly polished systems-thinking sentences. No dialogue tags, slang, or theatrical arguments.
+   - Summarize their consensus into a single-sentence 'consensus_summary'.`;
+
+  let debateJsonTemplate = `"boardroom_debate": {
+    "advisors": [
+      { "name": "Logical & Behavioral Perspective", "role": "Analyzes cognitive patterns, immediate impulses, and emotional framing" },
+      { "name": "Risk & Sustainability Perspective", "role": "Analyzes long-term viability, resource preservation, and environmental trade-offs" }
+    ],
+    "debate_transcript": [
+      { "speaker": "Logical & Behavioral Perspective", "message": "Short 1-2 sentence perspective summary." },
+      { "speaker": "Risk & Sustainability Perspective", "message": "Short 1-2 sentence perspective summary." }
+    ],
+    "consensus_summary": "Single sentence consensus summary."
+  }`;
+
+  if (customAdvisors && Array.isArray(customAdvisors) && customAdvisors.length > 0) {
+    boardroomDebateInstructions = `6. STRUCTURED PERSPECTIVE SIMULATION:
+   - Refine the debate into a structured analysis of conflicting viewpoints. Structure 'boardroom_debate' with exactly ${customAdvisors.length} expert perspectives matching these custom advisor profiles:
+     ${customAdvisors.map(adv => `* "${adv.name}" (Domain Expertise: ${adv.domainExpertise}, Risk Appetite: ${adv.riskAppetite}): ${adv.description || 'Provide perspectives matching this profile'}`).join('\n     ')}
+   - For each advisor, provide their specific perspective message in 'debate_transcript', limited to exactly 1-2 highly polished systems-thinking sentences matching their profile. Do NOT use dialogue tags or slang.
+   - Summarize their consensus into a single-sentence 'consensus_summary'.`;
+
+    const advisorsListJson = customAdvisors.map(adv => `{ "name": ${JSON.stringify(adv.name)}, "role": "Expert perspective on ${adv.domainExpertise}" }`).join(',\n      ');
+    const debateListJson = customAdvisors.map(adv => `{ "speaker": ${JSON.stringify(adv.name)}, "message": "Short 1-2 sentence perspective summary aligning with domain expertise." }`).join(',\n      ');
+
+    debateJsonTemplate = `"boardroom_debate": {
+    "advisors": [
+      ${advisorsListJson}
+    ],
+    "debate_transcript": [
+      ${debateListJson}
+    ],
+    "consensus_summary": "Single sentence consensus summary."
+  }`;
+  }
+
   const prompt = `You are "Decision Simulator AI", an industry-grade analytical decision-science and cognitive modeling system.
 Your purpose is to generate realistic, explainable, and behaviorally grounded decision simulations.
 
@@ -879,12 +969,7 @@ INSTRUCTIONS:
      * 'title': Text description (e.g. "Action taken" or "System reaction").
      * 'probability': 0-100 percentage.
      * 'branches': Array of child nodes with the same structure (each parent can branch into 1 or 2 child nodes, creating a real branching tree explorer. Max depth is 3 levels).
-6. STRUCTURED PERSPECTIVE SIMULATION:
-   - Refine the multi-agent debate into a structured analysis of conflicting viewpoints. Structure 'boardroom_debate' with exactly 2 expert perspectives:
-     * "Logical & Behavioral Perspective": Analyzes cognitive patterns, immediate impulses, and emotional framing.
-     * "Risk & Sustainability Perspective": Analyzes long-term viability, resource preservation, and environmental trade-offs.
-   - Keep each perspective message limited to exactly 1-2 highly polished systems-thinking sentences. No dialogue tags, slang, or theatrical arguments.
-   - Summarize their consensus into a single-sentence 'consensus_summary'.
+${boardroomDebateInstructions}
 7. KEY FACTORS:
    - Provide exactly 4 concise key factors to monitor, limited to exactly 6-8 words each.
 8. AUTO-CATEGORIZATION:
@@ -995,17 +1080,7 @@ Return response ONLY as a single valid JSON object following this structure:
     ],
     "reframed_decision": "Objective rephrased version"
   },
-  "boardroom_debate": {
-    "advisors": [
-      { "name": "Logical & Behavioral Perspective", "role": "Analyzes cognitive patterns, immediate impulses, and emotional framing" },
-      { "name": "Risk & Sustainability Perspective", "role": "Analyzes long-term viability, resource preservation, and environmental trade-offs" }
-    ],
-    "debate_transcript": [
-      { "speaker": "Logical & Behavioral Perspective", "message": "Short 1-2 sentence perspective summary." },
-      { "speaker": "Risk & Sustainability Perspective", "message": "Short 1-2 sentence perspective summary." }
-    ],
-    "consensus_summary": "Single sentence consensus summary."
-  },
+  ${debateJsonTemplate},
   "final_note": "A neutral analytical disclaimer."
 }
 Do NOT wrap the JSON inside markdown code blocks. Return raw JSON text only.`;
@@ -1156,7 +1231,7 @@ function getHeuristicBiases(text, biasScore) {
   return detected;
 }
 
-function generateServerSimulation(decision, riskTolerance, personality) {
+function generateServerSimulation(decision, riskTolerance, personality, customAdvisors) {
   const norm = decision.toLowerCase();
   const cleanNorm = norm.replace(/[?.!,]/g, '').trim();
 
@@ -1586,53 +1661,79 @@ function generateServerSimulation(decision, riskTolerance, personality) {
   }
 
   let reframedDecision = `Should I evaluate the exact trade-offs of proceeding with this decision objectively?`;
-  let advisors = [
-    { name: "Logical & Behavioral Perspective", role: "Analyzes cognitive patterns, immediate impulses, and emotional framing" },
-    { name: "Risk & Sustainability Perspective", role: "Analyzes long-term viability, resource preservation, and environmental trade-offs" }
-  ];
+  let advisors = [];
   let debateTranscript = [];
   let consensusSummary = "";
 
-  if (hasPet) {
-    reframedDecision = `What are the physiological safety differences between staying calm or utilizing direct food distraction when managing animal behaviors?`;
-    debateTranscript = [
-      { speaker: "Logical & Behavioral Perspective", message: "Moving energetically stimulates protective threat assessments or play-chase reflexes in domestic animals." },
-      { speaker: "Risk & Sustainability Perspective", message: "Confinement limits mobility margins, amplifying collision hazards and protective scratch probabilities. Static positioning reduces system volatility." }
-    ];
-    consensusSummary = "Use positive reinforcement or calm positioning as primary safety metrics, reserving physical play for outdoor spaces.";
-
-  } else if (hasSymptom && hasDestination) {
-    reframedDecision = `Should I prioritize biological healing today, or accept cognitive performance drops to maintain attendance?`;
-    debateTranscript = [
-      { speaker: "Logical & Behavioral Perspective", message: "Pushing through cognitive thresholds under physiological distress creates temporal performance depletion, leading to severe resource degradation." },
-      { speaker: "Risk & Sustainability Perspective", message: "Active viral shedding under high-density spatial exposure elevates systemic contagion variance, causing net productivity drops." }
-    ];
-    consensusSummary = "Prioritize immediate recovery to minimize long-term performance deficits, while securing remote accommodation options.";
-
-  } else if (hasLeisure && hasProductivity) {
-    reframedDecision = `How should I divide my available hours between study tasks and leisure to maintain stress-free productivity?`;
-    debateTranscript = [
-      { speaker: "Logical & Behavioral Perspective", message: "Temporal discounting heavily weights immediate recreational utilities over distant academic goals. Burning baseline study windows creates deadline-pressure spikes." },
-      { speaker: "Risk & Sustainability Perspective", message: "System performance is highly correlated with cumulative preparation assets. Trading preparation for leisure compounds downside risks of subpar grading outcomes." }
-    ];
-    consensusSummary = "Execute a Pomodoro or structured split-time system to secure progress before unlocking guilt-free leisure rewards.";
-
-  } else if (hasFood) {
-    reframedDecision = `Should I consume this questionable item with potential mold markers, or utilize a safe nutritional alternative?`;
-    debateTranscript = [
-      { speaker: "Logical & Behavioral Perspective", message: "Loss aversion framing over food expenditure bias prompts ingestion of questionable produce, ignoring severe systemic biological hazards." },
-      { speaker: "Risk & Sustainability Perspective", message: "Microbial toxicity ingestion creates immediate physiological operational risks, yielding high resource deficits that far outweigh produce replacement costs." }
-    ];
-    consensusSummary = "Do not consume if structural integrity has degraded; prioritize physical safety when spotless alternatives exist.";
-
+  if (customAdvisors && Array.isArray(customAdvisors) && customAdvisors.length > 0) {
+    advisors = customAdvisors.map(adv => ({
+      name: adv.name,
+      role: adv.description || `Expert lens on ${adv.domainExpertise}`
+    }));
+    customAdvisors.forEach(adv => {
+      let message = "";
+      const expertise = (adv.domainExpertise || '').toLowerCase();
+      if (expertise.includes('finance') || expertise.includes('money') || expertise.includes('invest')) {
+        message = `From a financial perspective, this choice requires careful capitalization trade-offs. We must minimize sunk cost exposure and secure a sound ${adv.riskAppetite}-risk margin.`;
+      } else if (expertise.includes('tech') || expertise.includes('software') || expertise.includes('engineer') || expertise.includes('code')) {
+        message = `Analyzing the technical variables, this action introduces path dependencies and design velocity constraints. Ensure adequate risk buffers for integration overhead.`;
+      } else if (expertise.includes('health') || expertise.includes('medical') || expertise.includes('wellness')) {
+        message = `Prioritize physical and cognitive wellness baselines. Short-term performance peaks should not trigger long-term biological metabolic deficits.`;
+      } else if (expertise.includes('relation') || expertise.includes('personal') || expertise.includes('love')) {
+        message = `Human capital networks and social stability indices are heavily impacted. We should establish clear boundary metrics and maintain high-fidelity feedback loops.`;
+      } else {
+        message = `Evaluating via my specialized profile. We should analyze immediate outcomes, preserve flexibility, and maintain a ${adv.riskAppetite === 'high' ? 'decisive expansion' : 'conservative boundary'} approach.`;
+      }
+      debateTranscript.push({ speaker: adv.name, message });
+    });
+    consensusSummary = `Synthesizing boardroom viewpoints suggests proceeding with structural parameters defined by ${customAdvisors.map(a => a.name).join(' and ')}.`;
   } else {
-    let actionStr = cleanNorm.replace(/should i|should we|i want to|i need to|is it good to|what if i/gi, '').trim() || 'this action';
-    reframedDecision = `What are the clear resource expenditures, risks, and compounding advantages of choosing to: "${actionStr}"?`;
-    debateTranscript = [
-      { speaker: "Logical & Behavioral Perspective", message: "Status quo preservation prevents immediate asset dissipation but caps potential utility upside and growth margins." },
-      { speaker: "Risk & Sustainability Perspective", message: "Resource commitment under incomplete informational variance introduces systemic exposure. Pilot phases limit capital degradation." }
+    advisors = [
+      { name: "Logical & Behavioral Perspective", role: "Analyzes cognitive patterns, immediate impulses, and emotional framing" },
+      { name: "Risk & Sustainability Perspective", role: "Analyzes long-term viability, resource preservation, and environmental trade-offs" }
     ];
-    consensusSummary = "Pursue the action through small, low-risk experiments to validate outcomes before committing significant resources.";
+
+    if (hasPet) {
+      reframedDecision = `What are the physiological safety differences between staying calm or utilizing direct food distraction when managing animal behaviors?`;
+      debateTranscript = [
+        { speaker: "Logical & Behavioral Perspective", message: "Moving energetically stimulates protective threat assessments or play-chase reflexes in domestic animals." },
+        { speaker: "Risk & Sustainability Perspective", message: "Confinement limits mobility margins, amplifying collision hazards and protective scratch probabilities. Static positioning reduces system volatility." }
+      ];
+      consensusSummary = "Use positive reinforcement or calm positioning as primary safety metrics, reserving physical play for outdoor spaces.";
+  
+    } else if (hasSymptom && hasDestination) {
+      reframedDecision = `Should I prioritize biological healing today, or accept cognitive performance drops to maintain attendance?`;
+      debateTranscript = [
+        { speaker: "Logical & Behavioral Perspective", message: "Pushing through cognitive thresholds under physiological distress creates temporal performance depletion, leading to severe resource degradation." },
+        { speaker: "Risk & Sustainability Perspective", message: "Active viral shedding under high-density spatial exposure elevates systemic contagion variance, causing net productivity drops." }
+      ];
+      consensusSummary = "Prioritize immediate recovery to minimize long-term performance deficits, while securing remote accommodation options.";
+  
+    } else if (hasLeisure && hasProductivity) {
+      reframedDecision = `How should I divide my available hours between study tasks and leisure to maintain stress-free productivity?`;
+      debateTranscript = [
+        { speaker: "Logical & Behavioral Perspective", message: "Temporal discounting heavily weights immediate recreational utilities over distant academic goals. Burning baseline study windows creates deadline-pressure spikes." },
+        { speaker: "Risk & Sustainability Perspective", message: "System performance is highly correlated with cumulative preparation assets. Trading preparation for leisure compounds downside risks of subpar grading outcomes." }
+      ];
+      consensusSummary = "Execute a Pomodoro or structured split-time system to secure progress before unlocking guilt-free leisure rewards.";
+  
+    } else if (hasFood) {
+      reframedDecision = `Should I consume this questionable item with potential mold markers, or utilize a safe nutritional alternative?`;
+      debateTranscript = [
+        { speaker: "Logical & Behavioral Perspective", message: "Loss aversion framing over food expenditure bias prompts ingestion of questionable produce, ignoring severe systemic biological hazards." },
+        { speaker: "Risk & Sustainability Perspective", message: "Microbial toxicity ingestion creates immediate physiological operational risks, yielding high resource deficits that far outweigh produce replacement costs." }
+      ];
+      consensusSummary = "Do not consume if structural integrity has degraded; prioritize physical safety when spotless alternatives exist.";
+  
+    } else {
+      let actionStr = cleanNorm.replace(/should i|should we|i want to|i need to|is it good to|what if i/gi, '').trim() || 'this action';
+      reframedDecision = `What are the clear resource expenditures, risks, and compounding advantages of choosing to: "${actionStr}"?`;
+      debateTranscript = [
+        { speaker: "Logical & Behavioral Perspective", message: "Status quo preservation prevents immediate asset dissipation but caps potential utility upside and growth margins." },
+        { speaker: "Risk & Sustainability Perspective", message: "Resource commitment under incomplete informational variance introduces systemic exposure. Pilot phases limit capital degradation." }
+      ];
+      consensusSummary = "Pursue the action through small, low-risk experiments to validate outcomes before committing significant resources.";
+    }
   }
 
   // Heuristic Emotional Analysis
@@ -1855,6 +1956,457 @@ function generateLocalSocraticQuestions(decision) {
       "What is the reversibility index of this choice if you encounter friction?",
       "What critical information is currently missing from your decision-making equation?"
     ]
+  };
+}
+
+// --- DEVELOPER WEBHOOKS DISPATCHER ---
+async function triggerWebhooks(event, data) {
+  const webhooks = loadJsonFile(WEBHOOKS_FILE_PATH, []);
+  if (webhooks.length === 0) return;
+
+  console.log(`[WEBHOOKS] Dispatching event "${event}" to ${webhooks.length} listeners...`);
+  const payload = {
+    event,
+    id: `evt_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+    timestamp: new Date().toISOString(),
+    data
+  };
+
+  const promises = webhooks.map(async (hook) => {
+    try {
+      const response = await fetch(hook.url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        timeout: 8000
+      });
+      console.log(`[WEBHOOK] Delivered to ${hook.url}. Status: ${response.status}`);
+    } catch (err) {
+      console.error(`[WEBHOOK ERROR] Failed delivery to ${hook.url}:`, err.message);
+    }
+  });
+
+  // Execute non-blocking
+  Promise.all(promises).catch(err => console.error('[WEBHOOKS RUNNER] Error in hooks:', err));
+}
+
+// --- PUBLIC DEVELOPER API /v1/simulate ---
+app.post('/api/v1/simulate', async (req, res) => {
+  // Simple API Key validation
+  const authHeader = req.headers['authorization'];
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Unauthorized. Missing or invalid Bearer API Key.' });
+  }
+
+  const apiKey = authHeader.split(' ')[1];
+  // Allow a default developer test key or any ds_live_ style key for demo sandbox
+  if (apiKey !== 'ds_live_test_key' && !apiKey.startsWith('ds_live_')) {
+    return res.status(401).json({ error: 'Unauthorized. Invalid Public API Key.' });
+  }
+
+  const { decision, risk, personality, advisors } = req.body;
+  if (!decision || !decision.trim()) {
+    return res.status(400).json({ error: 'Decision string is required.' });
+  }
+
+  const normalized = normalizeInput(decision);
+  const primaryModelStr = process.env.PRIMARY_MODEL || 'gemini/gemini-2.5-flash';
+  const primaryConfig = resolveModelConfig(primaryModelStr);
+  const primaryKey = getApiKeyForProvider(primaryConfig.provider);
+
+  let primaryResult = null;
+  if (isKeyConfigured(primaryKey)) {
+    try {
+      primaryResult = await generatePrimarySimulation(normalized, risk, personality, primaryConfig.provider, primaryConfig.model, primaryKey, advisors);
+    } catch (err) {
+      primaryResult = generateServerSimulation(normalized, risk, personality, advisors);
+    }
+  } else {
+    primaryResult = generateServerSimulation(normalized, risk, personality, advisors);
+  }
+
+  if (primaryResult.scenarios && Array.isArray(primaryResult.scenarios)) {
+    primaryResult.scenarios = ensureTemporalAndTree(primaryResult.scenarios, risk, personality);
+    primaryResult.scenarios = primaryResult.scenarios.map(s => {
+      if (s.temporal_outcomes) {
+        Object.keys(s.temporal_outcomes).forEach(year => {
+          const outcome = s.temporal_outcomes[year];
+          outcome.monte_carlo_distribution = runMonteCarlo(outcome.probability || 50, risk);
+        });
+      }
+      return s;
+    });
+  }
+
+  // Inject consensus stats manually
+  primaryResult.multi_model_comparison = {
+    consensus_score: 85,
+    consensus_level: "High Consensus",
+    details: [
+      { model: "Primary API", bias_score: primaryResult.cognitive_analysis?.bias_score || 50, intensity_score: primaryResult.emotional_analysis?.intensity_score || 50, primary_emotion: "balanced" }
+    ],
+    variances: ["API simulation completed successfully."]
+  };
+
+  // Trigger webhooks asynchronously
+  triggerWebhooks('simulation.completed', {
+    decision: normalized,
+    risk,
+    personality,
+    result: primaryResult,
+    timestamp: new Date().toISOString(),
+    triggeredBy: 'public_api'
+  });
+
+  return res.json(primaryResult);
+});
+
+// --- WEBHOOK MANAGEMENT ENDPOINTS ---
+app.get('/api/webhooks', (req, res) => {
+  const webhooks = loadJsonFile(WEBHOOKS_FILE_PATH, []);
+  res.json(webhooks);
+});
+
+app.post('/api/webhooks/register', (req, res) => {
+  const { url } = req.body;
+  if (!url || !url.trim().startsWith('http')) {
+    return res.status(400).json({ error: 'Valid HTTP/HTTPS Webhook URL is required.' });
+  }
+
+  const webhooks = loadJsonFile(WEBHOOKS_FILE_PATH, []);
+  const newHook = {
+    id: `wh_${Date.now()}`,
+    url: url.trim(),
+    created_at: new Date().toISOString()
+  };
+
+  webhooks.push(newHook);
+  saveJsonFile(WEBHOOKS_FILE_PATH, webhooks);
+  res.json({ message: 'Webhook registered successfully.', webhook: newHook });
+});
+
+app.delete('/api/webhooks/:id', (req, res) => {
+  const { id } = req.params;
+  const webhooks = loadJsonFile(WEBHOOKS_FILE_PATH, []);
+  const filtered = webhooks.filter(w => w.id !== id);
+
+  if (webhooks.length === filtered.length) {
+    return res.status(404).json({ error: 'Webhook not found.' });
+  }
+
+  saveJsonFile(WEBHOOKS_FILE_PATH, filtered);
+  res.json({ message: 'Webhook deleted successfully.' });
+});
+
+app.post('/api/webhooks/test', async (req, res) => {
+  const { url } = req.body;
+  if (!url || !url.trim().startsWith('http')) {
+    return res.status(400).json({ error: 'Valid Webhook URL is required to test.' });
+  }
+
+  console.log(`[WEBHOOK TEST] Sending test payload to: ${url}`);
+  const testPayload = {
+    event: 'simulation.test',
+    id: `evt_test_${Date.now()}`,
+    timestamp: new Date().toISOString(),
+    data: {
+      message: "This is a diagnostic test webhook from Decision Simulator AI Platform.",
+      status: "online",
+      engine: "Express.js Monte Carlo Simulation Core"
+    }
+  };
+
+  try {
+    const start = Date.now();
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(testPayload),
+      timeout: 8000
+    });
+    const duration = Date.now() - start;
+    const responseBody = await response.text();
+
+    res.json({
+      success: response.ok,
+      status: response.status,
+      statusText: response.statusText,
+      durationMs: duration,
+      responseBody: responseBody.slice(0, 300) // cap size
+    });
+  } catch (err) {
+    res.json({
+      success: false,
+      error: err.message
+    });
+  }
+});
+
+// --- COLLABORATIVE DECISION ROOMS ---
+app.post('/api/collab/create', async (req, res) => {
+  const { decision, risk, personality, hostName } = req.body;
+  if (!decision || !decision.trim() || !hostName || !hostName.trim()) {
+    return res.status(400).json({ error: 'Decision and host name are required.' });
+  }
+
+  // Generate a random 5-char code (e.g. ROOM-1234 -> code: "CD1A2")
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let roomCode = '';
+  for (let i = 0; i < 5; i++) {
+    roomCode += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+
+  const normalized = normalizeInput(decision);
+
+  // Generate scenarios right away so they are consolidated for everyone in the room
+  const primaryModelStr = process.env.PRIMARY_MODEL || 'gemini/gemini-2.5-flash';
+  const primaryConfig = resolveModelConfig(primaryModelStr);
+  const primaryKey = getApiKeyForProvider(primaryConfig.provider);
+
+  let scenariosResult = null;
+  if (isKeyConfigured(primaryKey)) {
+    try {
+      scenariosResult = await generatePrimarySimulation(normalized, risk, personality, primaryConfig.provider, primaryConfig.model, primaryKey);
+    } catch (err) {
+      scenariosResult = generateServerSimulation(normalized, risk, personality);
+    }
+  } else {
+    scenariosResult = generateServerSimulation(normalized, risk, personality);
+  }
+
+  if (scenariosResult.scenarios && Array.isArray(scenariosResult.scenarios)) {
+    scenariosResult.scenarios = ensureTemporalAndTree(scenariosResult.scenarios, risk, personality);
+    scenariosResult.scenarios = scenariosResult.scenarios.map(s => {
+      if (s.temporal_outcomes) {
+        Object.keys(s.temporal_outcomes).forEach(year => {
+          const outcome = s.temporal_outcomes[year];
+          outcome.monte_carlo_distribution = runMonteCarlo(outcome.probability || 50, risk);
+        });
+      }
+      return s;
+    });
+  }
+
+  const rooms = loadJsonFile(ROOMS_FILE_PATH, {});
+  const hostId = `usr_${Date.now()}`;
+  rooms[roomCode] = {
+    code: roomCode,
+    decision: normalized,
+    risk,
+    personality,
+    hostId,
+    hostName: hostName.trim(),
+    scenarios: scenariosResult.scenarios || [],
+    scenariosMeta: {
+      confidence_assessment: scenariosResult.confidence_assessment,
+      cognitive_analysis: scenariosResult.cognitive_analysis,
+      boardroom_debate: scenariosResult.boardroom_debate,
+      final_note: scenariosResult.final_note
+    },
+    participants: [{ id: hostId, name: hostName.trim(), personality: personality, isHost: true }],
+    votes: {}, // participantId -> array of scenario index suitability scores [5, 3, 4]
+    status: 'lobby', // 'lobby' | 'voting' | 'completed'
+    created_at: new Date().toISOString()
+  };
+
+  saveJsonFile(ROOMS_FILE_PATH, rooms);
+  res.json({
+    roomCode,
+    hostId,
+    room: rooms[roomCode]
+  });
+});
+
+app.post('/api/collab/join', (req, res) => {
+  const { code, participantName, personality } = req.body;
+  if (!code || !participantName || !participantName.trim()) {
+    return res.status(400).json({ error: 'Room code and participant name are required.' });
+  }
+
+  const cleanCode = code.trim().toUpperCase();
+  const rooms = loadJsonFile(ROOMS_FILE_PATH, {});
+  
+  if (!rooms[cleanCode]) {
+    return res.status(404).json({ error: 'Decision room not found. Check code.' });
+  }
+
+  const room = rooms[cleanCode];
+  const participantId = `usr_${Date.now()}`;
+  
+  // Prevent duplicate names joining
+  const exists = room.participants.some(p => p.name.toLowerCase() === participantName.trim().toLowerCase());
+  if (exists) {
+    return res.status(400).json({ error: 'Name already taken in this room.' });
+  }
+
+  room.participants.push({
+    id: participantId,
+    name: participantName.trim(),
+    personality: personality || 'balanced',
+    isHost: false
+  });
+
+  saveJsonFile(ROOMS_FILE_PATH, rooms);
+  res.json({
+    participantId,
+    room
+  });
+});
+
+app.post('/api/collab/start', (req, res) => {
+  const { code, hostId } = req.body;
+  const rooms = loadJsonFile(ROOMS_FILE_PATH, {});
+  const cleanCode = (code || '').trim().toUpperCase();
+
+  if (!rooms[cleanCode]) {
+    return res.status(404).json({ error: 'Room not found.' });
+  }
+
+  const room = rooms[cleanCode];
+  if (room.hostId !== hostId) {
+    return res.status(403).json({ error: 'Only the room host can start voting.' });
+  }
+
+  room.status = 'voting';
+  saveJsonFile(ROOMS_FILE_PATH, rooms);
+  res.json(room);
+});
+
+app.post('/api/collab/vote', (req, res) => {
+  const { code, participantId, votes } = req.body; // votes is array: [ { scenarioIndex: 0, suitability: 5 }, ... ]
+  if (!code || !participantId || !votes) {
+    return res.status(400).json({ error: 'Room code, participant, and votes are required.' });
+  }
+
+  const cleanCode = code.trim().toUpperCase();
+  const rooms = loadJsonFile(ROOMS_FILE_PATH, {});
+  
+  if (!rooms[cleanCode]) {
+    return res.status(404).json({ error: 'Room not found.' });
+  }
+
+  const room = rooms[cleanCode];
+  
+  // Store participant votes
+  room.votes[participantId] = votes;
+
+  // Check if everyone voted
+  const activeParticipantsCount = room.participants.length;
+  const votesCount = Object.keys(room.votes).length;
+
+  if (votesCount >= activeParticipantsCount) {
+    room.status = 'completed';
+    // Calculate consensus aggregation
+    room.consensus = calculateGroupConsensus(room);
+  }
+
+  saveJsonFile(ROOMS_FILE_PATH, rooms);
+  res.json(room);
+});
+
+app.get('/api/collab/room/:code', (req, res) => {
+  const code = req.params.code.trim().toUpperCase();
+  const rooms = loadJsonFile(ROOMS_FILE_PATH, {});
+
+  if (!rooms[code]) {
+    return res.status(404).json({ error: 'Room not found.' });
+  }
+
+  res.json(rooms[code]);
+});
+
+// Helper for collaborative room consensus calculations
+function calculateGroupConsensus(room) {
+  const { participants, votes, scenarios } = room;
+  
+  // Calculate weighted votes per scenario path
+  const consensusResults = scenarios.map((scenario, scenarioIdx) => {
+    let totalWeightedScore = 0;
+    let totalWeights = 0;
+    const individualVotes = [];
+
+    participants.forEach((participant) => {
+      const pId = participant.id;
+      const pVotes = votes[pId] || [];
+      const voteObj = pVotes.find(v => v.scenarioIndex === scenarioIdx);
+      const suitability = voteObj ? voteObj.suitability : 3; // default neutral if not voted
+
+      // Weight multiplier based on how participant personality aligns with scenario risk/reward
+      let matchWeight = 1.0;
+      const personality = participant.personality;
+      const activeOutcome = scenario.temporal_outcomes?.["3"] || scenario; // check medium-term 3Y metrics
+      const metrics = activeOutcome.radar_metrics || { risk: 50, reward: 50, time_cost: 50, emotional_toll: 50, reversibility: 50 };
+
+      if (personality === 'analytical') {
+        // High reward + high reversibility
+        matchWeight = (metrics.reward * 1.5 + metrics.reversibility * 1.0 - metrics.risk * 0.5) / 100;
+      } else if (personality === 'risk-taker') {
+        // High reward + high risk
+        matchWeight = (metrics.reward * 1.5 + metrics.risk * 1.5 - metrics.time_cost * 0.5) / 100;
+      } else if (personality === 'emotional') {
+        // Low emotional toll + low time cost
+        matchWeight = ((100 - metrics.emotional_toll) * 1.5 + (100 - metrics.time_cost) * 1.0) / 100;
+      } else {
+        // Balanced
+        matchWeight = 1.0;
+      }
+
+      // bound weight between 0.4 and 2.0 to make it impactful but reasonable
+      matchWeight = Math.max(0.4, Math.min(2.0, matchWeight));
+
+      totalWeightedScore += suitability * matchWeight;
+      totalWeights += matchWeight;
+
+      individualVotes.push({
+        name: participant.name,
+        personality,
+        rawVote: suitability,
+        weightedVote: Math.round(suitability * matchWeight * 10) / 10,
+        alignmentIndex: Math.round(matchWeight * 100)
+      });
+    });
+
+    const weightedScoreAverage = totalWeights > 0 ? (totalWeightedScore / totalWeights) : 3;
+    const rawAverage = participants.reduce((sum, p) => {
+      const pVotes = votes[p.id] || [];
+      const voteObj = pVotes.find(v => v.scenarioIndex === scenarioIdx);
+      return sum + (voteObj ? voteObj.suitability : 3);
+    }, 0) / participants.length;
+
+    return {
+      scenarioIndex: scenarioIdx,
+      title: scenario.title,
+      weightedScore: Math.round(weightedScoreAverage * 10) / 10,
+      rawScore: Math.round(rawAverage * 10) / 10,
+      individualVotes
+    };
+  });
+
+  // Calculate consensus index (standard deviation of votes across all paths)
+  let standardDeviations = 0;
+  consensusResults.forEach(res => {
+    const mean = res.rawScore;
+    const variance = res.individualVotes.reduce((sum, v) => sum + Math.pow(v.rawVote - mean, 2), 0) / participants.length;
+    standardDeviations += Math.sqrt(variance);
+  });
+  
+  const avgStdDev = standardDeviations / consensusResults.length;
+  // Convert standard deviation (max 2 for 1-5 scale) to 0-100 agreement index
+  let agreementScore = Math.max(0, Math.min(100, Math.round(100 - (avgStdDev * 45))));
+  
+  let consensusLevel = "Moderate Consensus";
+  if (agreementScore > 85) consensusLevel = "High Consensus Agreement";
+  else if (agreementScore < 60) consensusLevel = "Strong Divergent Perspectives";
+
+  // Find winning path
+  const sortedByScore = [...consensusResults].sort((a, b) => b.weightedScore - a.weightedScore);
+  const winningPathTitle = sortedByScore[0].title;
+
+  return {
+    agreementScore,
+    consensusLevel,
+    winningPathTitle,
+    results: consensusResults
   };
 }
 

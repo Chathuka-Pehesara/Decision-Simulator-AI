@@ -838,7 +838,7 @@ export default function ResultScreen({ route, navigation }) {
                       <View key={scIdx} style={styles.keyIndicatorGroup}>
                         <View style={[styles.legendIndicator, { backgroundColor: scColor }]} />
                         <Text style={[styles.legendText, { color: scColor }]}>
-                          Path 0{scIdx + 1}: {sc.title.length > 22 ? sc.title.slice(0, 22) + '...' : sc.title}
+                          Path 0{scIdx + 1}: {sc.title}
                         </Text>
                       </View>
                     );
@@ -999,6 +999,47 @@ export default function ResultScreen({ route, navigation }) {
           </View>
         )}
 
+        {/* SECTION 3: BOARDROOM ADVISOR DEBATE */}
+        {boardroom_debate && boardroom_debate.debate_transcript && boardroom_debate.debate_transcript.length > 0 && (
+          <View style={{ marginBottom: SPACING.xl }}>
+            <SectionHeaderChip title="👥 Boardroom Advisor Debate" theme={theme} />
+            
+            <Card style={styles.debateCard} outlined shadowed={false}>
+              <Text style={[styles.debateSubtitle, { color: theme.colors.textSecondary, fontFamily: theme.typography.subtext.fontFamily }]}>
+                ROLEPLAY DIALOGUE BETWEEN CHOSEN EXPERT ADVISORS
+              </Text>
+              
+              {/* Debate Transcript */}
+              <View style={styles.transcriptContainer}>
+                {boardroom_debate.debate_transcript.map((item, idx) => {
+                  return (
+                    <View key={idx.toString()} style={[styles.transcriptBubble, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface, marginBottom: 8 }]}>
+                      <Text style={[styles.speakerName, { color: theme.colors.accentBlue }]}>
+                        👤 {item.speaker?.toUpperCase()}
+                      </Text>
+                      <Text style={[styles.speakerMessage, { color: theme.colors.textPrimary }]}>
+                        "{item.message}"
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+              
+              {/* Consensus Summary */}
+              {boardroom_debate.consensus_summary && (
+                <View style={[styles.consensusSummaryBox, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+                  <Text style={[styles.consensusSummaryTitle, { color: theme.colors.accentViolet, fontFamily: theme.typography.subtext.fontFamily }]}>
+                    BOARD CONSENSUS SUMMARY
+                  </Text>
+                  <Text style={[styles.consensusSummaryText, { color: theme.colors.textPrimary }]}>
+                    {boardroom_debate.consensus_summary}
+                  </Text>
+                </View>
+              )}
+            </Card>
+          </View>
+        )}
+
         {/* 60/40 ASYMMETRIC GRID WRAPPER */}
         <View style={[styles.gridContainer, { flexDirection: Platform.OS === 'web' ? 'row' : 'column' }]}>
           
@@ -1028,7 +1069,7 @@ export default function ResultScreen({ route, navigation }) {
                   shadowed={false}
                 >
                   <View style={styles.outcomeHeader}>
-                    <View>
+                    <View style={{ flex: 1, marginRight: SPACING.sm }}>
                       <Text style={[styles.outcomeScenarioNum, { color: theme.colors.textMuted }]}>PATH 0{index + 1}</Text>
                       <Text style={[styles.outcomeTitle, { color: theme.colors.textPrimary }]}>{scenario.title}</Text>
                     </View>
@@ -1639,6 +1680,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: BORDER_RADIUS.sm,
+    flexShrink: 0,
   },
   riskBadgeText: {
     fontFamily: 'Orbitron',
@@ -1936,6 +1978,7 @@ const styles = StyleSheet.create({
     fontFamily: 'IBM Plex Mono',
     fontSize: 10,
     lineHeight: 14,
+    flexShrink: 1,
   },
   legendIndicator: {
     width: 10,
@@ -2144,5 +2187,54 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '900',
     letterSpacing: 1.2,
+  },
+  debateCard: {
+    padding: SPACING.lg,
+    borderRadius: BORDER_RADIUS.lg,
+  },
+  debateSubtitle: {
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1.2,
+    marginBottom: SPACING.md,
+  },
+  transcriptContainer: {
+    gap: SPACING.md,
+    marginBottom: SPACING.md,
+  },
+  transcriptBubble: {
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
+    borderWidth: 1,
+  },
+  speakerName: {
+    fontFamily: 'Orbitron',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  speakerMessage: {
+    fontFamily: 'IBM Plex Mono',
+    fontSize: 13,
+    lineHeight: 18,
+    fontStyle: 'italic',
+  },
+  consensusSummaryBox: {
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
+    borderWidth: 1,
+    marginTop: SPACING.xs,
+  },
+  consensusSummaryTitle: {
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1.2,
+    marginBottom: 4,
+  },
+  consensusSummaryText: {
+    fontFamily: 'IBM Plex Mono',
+    fontSize: 13,
+    lineHeight: 18,
   },
 });

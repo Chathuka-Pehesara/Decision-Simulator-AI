@@ -15,7 +15,10 @@ async function runDiagnostics() {
     try {
       const response = await fetch("http://localhost:3000/simulate", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "x-user-tier": "pro"
+        },
         body: JSON.stringify(tc)
       });
       const data = await response.json();
@@ -26,8 +29,12 @@ async function runDiagnostics() {
       console.log(`📈 Scenarios Count:                 ${data.scenarios?.length}`);
       console.log(`📈 Probabilities & Justifications:`);
       data.scenarios?.forEach((sc, idx) => {
-        console.log(`   [Path ${idx+1}] Probability: ${sc.probability}% (Emotional Impact: ${sc.emotional_impact})`);
-        console.log(`         Reasoning: "${sc.reasoning}"`);
+        const activeOutcome = sc.temporal_outcomes?.[3] || sc.temporal_outcomes?.["3"] || sc;
+        const prob = activeOutcome.probability ?? sc.probability;
+        const emo = activeOutcome.emotional_impact ?? sc.emotional_impact;
+        const reason = activeOutcome.reasoning ?? sc.reasoning ?? activeOutcome.description;
+        console.log(`   [Path ${idx+1}] Probability: ${prob}% (Emotional Impact: ${emo})`);
+        console.log(`         Reasoning: "${reason}"`);
       });
     } catch (err) {
       console.error(`❌ Fetch error:`, err.message);

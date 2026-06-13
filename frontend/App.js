@@ -14,6 +14,10 @@ import ResultScreen from './src/screens/ResultScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
 import CompareScreen from './src/screens/CompareScreen';
 import DashboardScreen from './src/screens/DashboardScreen';
+import SubscriptionScreen from './src/screens/SubscriptionScreen';
+import AdvisorsScreen from './src/screens/AdvisorsScreen';
+import PlatformScreen from './src/screens/PlatformScreen';
+import CollabRoomScreen from './src/screens/CollabRoomScreen';
 
 // Theme Spacing & Colors
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
@@ -94,6 +98,34 @@ function MainAppContent() {
           component={DashboardScreen} 
           options={{ 
             title: 'Bias Dashboard',
+          }} 
+        />
+        <Stack.Screen 
+          name="Subscription" 
+          component={SubscriptionScreen} 
+          options={{ 
+            title: 'Subscription Deck',
+          }} 
+        />
+        <Stack.Screen 
+          name="Advisors" 
+          component={AdvisorsScreen} 
+          options={{ 
+            title: 'Board Panel',
+          }} 
+        />
+        <Stack.Screen 
+          name="Platform" 
+          component={PlatformScreen} 
+          options={{ 
+            title: 'Developer Platform',
+          }} 
+        />
+        <Stack.Screen 
+          name="CollabRoom" 
+          component={CollabRoomScreen} 
+          options={{ 
+            title: 'Co-Simulation Lobby',
           }} 
         />
       </Stack.Navigator>
