@@ -6,6 +6,11 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#151718"
+    },
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
@@ -29,6 +34,11 @@
     },
     "plugins": [
       "expo-font"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "fea8d5de-a7d9-4ef9-91d8-383b71c04073"
+      }
+    }
   }
 }
